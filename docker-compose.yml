@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  davos-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4173:4173"  # For preview server
+    environment:
+      # Pass environment variables from .env file
+      - VITE_OPENAI_API_KEY=${VITE_OPENAI_API_KEY}
+      - VITE_DAVOS_API_ENDPOINT=${VITE_DAVOS_API_ENDPOINT}
+      - VITE_DELEGATE_CONTRACT_ADDRESS=${VITE_DELEGATE_CONTRACT_ADDRESS}
+    # This will use the CMD from the Dockerfile (pnpm preview --host 0.0.0.0)
