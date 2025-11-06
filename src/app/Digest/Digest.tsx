@@ -62,10 +62,10 @@ export default function Digest() {
     }
   };
   
-  // Filter overview DAO summaries
+  // Filter overview DAO summaries - Use snapshot as source of Digest info to avoid duplication //TODO handle tally DAOs info
   const filteredDao = selectedGlobalDao 
-    ? Object.values(daoConfig).filter(dao => dao.name.toLowerCase() === selectedGlobalDao)
-    : Object.values(daoConfig);
+    ? Object.values(daoConfig).filter(dao => dao.name.toLowerCase() === selectedGlobalDao && !dao.source.toLowerCase().includes('tally'))
+    : Object.values(daoConfig).filter(dao => !dao.source.toLowerCase().includes('tally'));
 
   // Render loading skeletons for daily digest
   const renderSkeletons = () => (

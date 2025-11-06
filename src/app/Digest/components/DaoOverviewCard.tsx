@@ -7,7 +7,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { GLOBAL_REPORT_DIRECTIVE, PROPOSALS_QUERY, SPACE_QUERY } from "@/lib/constants";
 import { useGraphQL } from "@/hooks/use-dao";
 import { useAI } from "@/hooks/use-ai";
-import { filterProposalsByAge } from "@/lib/dao-utils";
 import Markdown from "react-markdown";
 import { NavLink } from "react-router";
 
@@ -35,20 +34,20 @@ export function DaoOverviewCard({ dao  }: { dao: any }) {
   // Process the most recent proposals for the AI summary
   const latestProposals = useMemo(() => {
     return !isLoading && !error && proposals.length > 0
-      ? filterProposalsByAge(proposals, 30)
+      ? proposals.slice(-20)
       : [];
   }, [proposals, isLoading, error]);
 
   const prompt = useMemo(() => {
-    if (proposals.length === 0) return '';
+    if (proposals.length === 0 || isLoading) return '';
     
     // Create a concatenated string of all latest proposal titles and short body excerpts
     const proposalSummaries = latestProposals
-      .map(p => `BEGIN "${p.title}" - ${p.body} END`)
+      .map((p: any) => `BEGIN "${p.title}" - ${p.body} END`)
       .join('\n');
-    
+
     return `Recent proposals: ${proposalSummaries}`;
-  }, [latestProposals, dao, spaceData]);
+  }, [latestProposals, dao, spaceData, isLoading]);
   
     // Use the AI hook to generate the summary
   const { 
