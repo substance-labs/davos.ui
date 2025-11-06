@@ -77,10 +77,10 @@ export const CHAIN_IDS = {
 // ============================================================================
 
 export const MONTHLY_REPORT_DIRECTIVE = 
-  'Based on the following information, provide a concise summary (max 15 sentences) of the current state for non technical people and focus of the following DAO. Provide, if possible, a list of the most important topics that are being discussed in the DAO.';
+  'Based on the following information, provide a concise non technical summary summary (max 15 sentences and no title) of the current state and focus of the following DAO. Provide, if possible, a list of the most important topics that are being discussed in the DAO.';
 
 export const GLOBAL_REPORT_DIRECTIVE = 
-  'Based on the following information, provide a concise summary (max 30 sentences) of the current DAO for non technical people. What is it about, why was it created, when was it created? Provide a reason why the user would want to join this DAO.';
+  'Based on the following information, provide a concise non technical summary (max 30 sentences and no title) of the current DAO. What is it about, why was it created, when was it created? Provide a reason why the user would want to join this DAO.';
 
 export const PROPROSAL_DIRECTIVE = 
   'Provide a concise summary (max 5 sentences) of the provided proposal. Include the most important points and a summary of the proposal. Provide a reason why the user would want to vote for or against this proposal.';
