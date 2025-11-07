@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { GLOBAL_REPORT_DIRECTIVE, PROPOSALS_QUERY, SPACE_QUERY } from "@/lib/constants";
 import { useGraphQL } from "@/hooks/use-dao";
 import { useAI } from "@/hooks/use-ai";
+import { processProposalsForDigest } from "@/lib/dao-utils";
 import Markdown from "react-markdown";
 import { NavLink } from "react-router";
 
@@ -25,31 +26,18 @@ export function DaoOverviewCard({ dao  }: { dao: any }) {
     space: dao.identifier,
     limit: spaceResult?.space?.proposalsCount,
   });
-  const spaceData = spaceResult?.space;
   const proposals = proposalsResult?.proposals || [];
 
   const isLoading = isSpaceLoading || isProposalsLoading;
   const error = spaceError || proposalsError;
 
   // Process the most recent proposals for the AI summary
-  const latestProposals = useMemo(() => {
-    return !isLoading && !error && proposals.length > 0
-      ? proposals.slice(-20)
-      : [];
-  }, [proposals, isLoading, error]);
-
-  const prompt = useMemo(() => {
-    if (proposals.length === 0 || isLoading) return '';
-    
-    // Create a concatenated string of all latest proposal titles and short body excerpts
-    const proposalSummaries = latestProposals
-      .map((p: any) => `BEGIN "${p.title}" - ${p.body} END`)
-      .join('\n');
-
-    return `Recent proposals: ${proposalSummaries}`;
-  }, [latestProposals, dao, spaceData, isLoading]);
+  const { prompt } = useMemo(() => 
+    processProposalsForDigest(proposals, isLoading, error),
+    [proposals, isLoading, error]
+  );
   
-    // Use the AI hook to generate the summary
+  // Use the AI hook to generate the summary
   const { 
     data: daoSummary, 
     isLoading: loadingSummary

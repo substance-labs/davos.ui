@@ -20,7 +20,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
-import { filterProposalsByAge, fetchProposals } from "@/lib/dao-utils";
+import { fetchProposals, processProposalsForDigest } from "@/lib/dao-utils";
 import { Delegate } from "../Delegate/Delegate";
 import Markdown from "react-markdown";
 import { useAgents } from "@/contexts/AgentContext";
@@ -233,24 +233,11 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
   const isLoading = isSpaceLoading || isLoadingProposals;
   const error = spaceError || proposalsError;
 
-  // Process the most recent proposals for the AI summary
-  const latestProposals = useMemo(() => {
-    return !isLoading && !error && proposals.length > 0
-      ? filterProposalsByAge(proposals, RECENT_PROPOSALS_DAYS)
-      : [];
-  }, [proposals, isLoading, error]);
-  
-  // Create the prompt for the AI summary
-  const prompt = useMemo(() => {
-    if (latestProposals.length === 0) return '';
-    
-    // Create a concatenated string of all latest proposal titles and short body excerpts
-    const proposalSummaries = latestProposals
-      .map((p: any) => `BEGIN "${p.title || 'No title'}" - ${p.body || 'No description'} END`)
-      .join('\n');
-    
-    return `Recent proposals: ${proposalSummaries}`;
-  }, [latestProposals, dao, spaceData]);
+  // Process the most recent proposals for the AI summary and generate prompt
+  const { prompt } = useMemo(() => 
+    processProposalsForDigest(proposals, isLoading, error, RECENT_PROPOSALS_DAYS),
+    [proposals, isLoading, error]
+  );
 
   // Use the AI hook to generate the summary
   const { 

@@ -206,6 +206,35 @@ export const filterProposalsByAge = (proposals: any[], maxAgeDays: number) => {
 };
 
 /**
+ * Process proposals to extract the most recent ones and generate an AI prompt
+ * @param proposals - Array of proposals
+ * @param isLoading - Loading state
+ * @param error - Error state
+ * @param maxProposals - Maximum number of proposals to return (default: 20)
+ * @returns Object containing latest proposals and the generated prompt
+ */
+export function processProposalsForDigest(
+  proposals: any[],
+  isLoading: boolean,
+  error: any,
+  maxProposals: number = 20
+) {
+  const latestProposals = 
+    !isLoading && !error && proposals.length > 0
+      ? proposals.slice(-maxProposals)
+      : [];
+
+  const prompt = 
+    proposals.length === 0 || isLoading
+      ? ''
+      : `Recent proposals: ${latestProposals
+          .map((p: any) => `BEGIN "${p.title}" - ${p.body} END`)
+          .join('\n')}`;
+
+  return { latestProposals, prompt };
+}
+
+/**
  * Convert time string in format "HH:MM" or "MM" to minutes
  */
 export const parseTimeToMinutes = (timeStr: string | number): number => {

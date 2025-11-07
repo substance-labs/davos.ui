@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MONTHLY_REPORT_DIRECTIVE, PROPOSALS_QUERY, SPACE_QUERY } from "@/lib/constants";
 import { useGraphQL } from "@/hooks/use-dao";
-import { filterProposalsByAge } from "@/lib/dao-utils";
+import { processProposalsForDigest } from "@/lib/dao-utils";
 import { useAI } from "@/hooks/use-ai";
 import { formatNumber } from "@/lib/utils";
 import Markdown from "react-markdown";
@@ -29,18 +29,10 @@ export function DaoMonthlyCard({ dao }: { dao: any }) {
     space: dao.identifier,
     limit: spaceResult?.space?.proposalsCount,
   });
-  const spaceData = spaceResult?.space;
   const proposals = proposalsResult?.proposals || [];
 
   const isLoading = isSpaceLoading || isProposalsLoading;
   const error = spaceError || proposalsError;
-
-  // Process the most recent proposals for the AI summary
-  const latestProposals = useMemo(() => {
-    return !isLoading && !error && proposals.length > 0
-      ? filterProposalsByAge(proposals, 30)
-      : [];
-  }, [proposals, isLoading, error]);
 
   const promptData = {
     proposalsCount: proposals.length,
@@ -51,22 +43,17 @@ export function DaoMonthlyCard({ dao }: { dao: any }) {
 
   };
 
-  const prompt = useMemo(() => {
-    if (proposals.length === 0) return '';
-    
-    // Create a concatenated string of all latest proposal titles and short body excerpts
-    const proposalSummaries = latestProposals
-      .map(p => `BEGIN "${p.title}" - ${p.body} END`)
-      .join('\n');
-    
-    return `Recent proposals: ${proposalSummaries}`;
-  }, [latestProposals, dao, spaceData]);
+  // Process the most recent proposals for the AI summary and generate prompt
+  const { latestProposals, prompt } = useMemo(() => 
+    processProposalsForDigest(proposals, isLoading, error, 30),
+    [proposals, isLoading, error]
+  );
   
-    // Use the AI hook to generate the summary
-    const { 
-      data: daoSummary, 
-      isLoading: loadingSummary
-    } = useAI(MONTHLY_REPORT_DIRECTIVE, prompt, dao.name, {
+  // Use the AI hook to generate the summary
+  const { 
+    data: daoSummary, 
+    isLoading: loadingSummary
+  } = useAI(MONTHLY_REPORT_DIRECTIVE, prompt, dao.name, {
     // Only enable when we have a prompt and context
     enabled: prompt !== '',
     // Use a longer stale time for summaries (30 min)
