@@ -13,6 +13,7 @@ export interface NormalizedProposal {
   totalVotes: number;
   author: string;
   source: 'snapshot' | 'tally';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sourceData: any; // Original data from source
 }
 
@@ -24,12 +25,14 @@ export interface NormalizedDAO {
   proposalsCount: number;
   votesCount: number;
   source: 'snapshot' | 'tally';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sourceData: any;
 }
 
 /**
  * Normalize Snapshot proposal to unified format
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function normalizeSnapshotProposal(proposal: any): NormalizedProposal {
   return {
     id: proposal.id,
@@ -55,6 +58,7 @@ type NormalizeTallyProposalOptions = {
   endTimestamp?: number;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const parseTimestamp = (value: any): number => {
   if (!value) {
     return 0;
@@ -86,6 +90,7 @@ const parseTimestamp = (value: any): number => {
 };
 
 export function normalizeTallyProposal(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   proposal: any,
   options: NormalizeTallyProposalOptions = {}
 ): NormalizedProposal {
@@ -127,11 +132,12 @@ export function normalizeTallyProposal(
 
   for (const stat of voteStatsList) {
     const type = typeof stat?.type === 'string' ? stat.type.toLowerCase() : '';
-    const votesCount = typeof stat?.votesCount === 'string'
-      ? parseInt(stat.votesCount, 10)
-      : typeof stat?.votesCount === 'number'
-        ? stat.votesCount
-        : 0;
+    const votesCount =
+      typeof stat?.votesCount === 'string'
+        ? parseInt(stat.votesCount, 10)
+        : typeof stat?.votesCount === 'number'
+          ? stat.votesCount
+          : 0;
 
     if (Number.isNaN(votesCount) || votesCount <= 0) {
       continue;
@@ -177,9 +183,7 @@ export function normalizeTallyProposal(
 /**
  * Normalize Snapshot proposal state to unified format
  */
-function normalizeSnapshotState(
-  state: string
-): NormalizedProposal['state'] {
+function normalizeSnapshotState(state: string): NormalizedProposal['state'] {
   switch (state?.toLowerCase()) {
     case 'pending':
       return 'pending';
@@ -195,9 +199,7 @@ function normalizeSnapshotState(
 /**
  * Normalize Tally proposal state to unified format
  */
-function normalizeTallyState(
-  state: string
-): NormalizedProposal['state'] {
+function normalizeTallyState(state: string): NormalizedProposal['state'] {
   const normalizedState = state?.toUpperCase();
   switch (normalizedState) {
     case 'PENDING':
@@ -242,6 +244,7 @@ function normalizeTallyState(
 /**
  * Normalize Snapshot DAO to unified format
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function normalizeSnapshotDAO(space: any): NormalizedDAO {
   return {
     id: space.id,
@@ -258,6 +261,7 @@ export function normalizeSnapshotDAO(space: any): NormalizedDAO {
 /**
  * Normalize Tally DAO to unified format
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function normalizeTallyDAO(governor: any): NormalizedDAO {
   return {
     id: governor.id,

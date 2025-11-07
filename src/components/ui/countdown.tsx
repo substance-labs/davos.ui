@@ -1,24 +1,20 @@
-import * as React from "react";
-import { cn } from "@/lib/utils";
-import { Badge, badgeVariants } from "./badge";
-import type { VariantProps } from "class-variance-authority";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Check, X, CircleOff } from "lucide-react"; // Import Lucide icons
+import * as React from 'react';
+import { cn } from '@/lib/utils';
+import { Badge, badgeVariants } from './badge';
+import type { VariantProps } from 'class-variance-authority';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Check, X, CircleOff } from 'lucide-react'; // Import Lucide icons
 
-type BadgeProps = React.ComponentProps<"span"> & VariantProps<typeof badgeVariants> & { asChild?: boolean };
+type BadgeProps = React.ComponentProps<'span'> &
+  VariantProps<typeof badgeVariants> & { asChild?: boolean };
 
 export interface CountdownProps extends React.HTMLAttributes<HTMLDivElement> {
   endDate: string | number | Date;
   compact?: boolean;
-  badgeVariant?: BadgeProps["variant"];
+  badgeVariant?: BadgeProps['variant'];
   onComplete?: () => void;
   className?: string;
-  hoursOffset?: number; 
+  hoursOffset?: number;
   proposalId?: string;
   voteStatus?: 'yes' | 'no' | 'not-voted' | null; // Add this prop to accept vote status from parent
 }
@@ -30,7 +26,7 @@ export function Countdown({
   onComplete,
   className,
   hoursOffset = 0,
-  proposalId,
+  proposalId: _proposalId, // eslint-disable-line @typescript-eslint/no-unused-vars
   voteStatus = null, // Default to null if not provided
   ...props
 }: CountdownProps) {
@@ -47,10 +43,10 @@ export function Countdown({
     seconds: 0,
     isExpired: false,
   });
-  
+
   // Add state to track the pulse animation
   const [pulse, setPulse] = React.useState(false);
-  
+
   // Reference to previous time values to detect changes
   const prevTimeRef = React.useRef({
     days: -1,
@@ -71,7 +67,7 @@ export function Countdown({
       const offsetMilliseconds = hoursOffset * 60 * 60 * 1000;
       const adjustedEndTime = endDateTime - offsetMilliseconds;
       const difference = adjustedEndTime - now;
-      
+
       if (difference <= 0) {
         setTimeLeft({
           days: 0,
@@ -80,7 +76,7 @@ export function Countdown({
           seconds: 0,
           isExpired: true,
         });
-        
+
         if (onComplete) {
           onComplete();
         }
@@ -92,14 +88,14 @@ export function Countdown({
       const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((difference % (1000 * 60)) / 1000);
-      
+
       // Check if any value has changed
-      const hasChanged = 
-        days !== prevTimeRef.current.days || 
+      const hasChanged =
+        days !== prevTimeRef.current.days ||
         hours !== prevTimeRef.current.hours ||
         minutes !== prevTimeRef.current.minutes ||
         seconds !== prevTimeRef.current.seconds;
-      
+
       // Only trigger pulse if something changed
       if (hasChanged) {
         setPulse(true);
@@ -107,15 +103,15 @@ export function Countdown({
           setPulse(false);
         }, 500);
       }
-      
+
       // Update reference values for next comparison
       prevTimeRef.current = {
         days,
         hours,
         minutes,
-        seconds
+        seconds,
       };
-      
+
       setTimeLeft({
         days,
         hours,
@@ -135,23 +131,23 @@ export function Countdown({
   }, [endDate, onComplete, hoursOffset]);
 
   // Determine badge variant dynamically
-  const determineBadgeVariant = (): BadgeProps["variant"] => {
+  const determineBadgeVariant = (): BadgeProps['variant'] => {
     if (badgeVariant) return badgeVariant;
-    
+
     if (timeLeft.isExpired) {
-      if (voteStatus === 'yes') return "default";
-      if (voteStatus === 'no') return "destructive";
-      return "outline"; // Not voted
+      if (voteStatus === 'yes') return 'default';
+      if (voteStatus === 'no') return 'destructive';
+      return 'outline'; // Not voted
     }
 
-    if (timeLeft.days > 0) return "secondary"; // More than 1 day - default (green)
-    
+    if (timeLeft.days > 0) return 'secondary'; // More than 1 day - default (green)
+
     if (timeLeft.days === 0) {
-      if (timeLeft.hours < 2) return "destructive"; // Less than 2 hours - destructive (red)
-      if (timeLeft.hours < 24) return "default"; // Less than 24 hours - secondary (purple)
+      if (timeLeft.hours < 2) return 'destructive'; // Less than 2 hours - destructive (red)
+      if (timeLeft.hours < 24) return 'default'; // Less than 24 hours - secondary (purple)
     }
-    
-    return "default"; // Default for longer times
+
+    return 'default'; // Default for longer times
   };
 
   const formatTimeValue = (value: number) => {
@@ -186,51 +182,52 @@ export function Countdown({
     }
 
     const showSeconds = timeLeft.days === 0 && timeLeft.hours === 0;
-    
+
     // Determine which unit should be animated based on actual changes
     const animateSeconds = pulse && prevTimeRef.current.seconds !== timeLeft.seconds;
     const animateMinutes = pulse && prevTimeRef.current.minutes !== timeLeft.minutes;
     const animateHours = pulse && prevTimeRef.current.hours !== timeLeft.hours;
     const animateDays = pulse && prevTimeRef.current.days !== timeLeft.days;
-    
+
     if (compact) {
       if (timeLeft.days > 0) {
         return (
           <>
-            <span className={animateDays ? "animate-pulse-seconds" : ""}>
-              {timeLeft.days}d
-            </span>
+            <span className={animateDays ? 'animate-pulse-seconds' : ''}>{timeLeft.days}d</span>
             <span> {formatTimeValue(timeLeft.hours)}h</span>
           </>
         );
       }
-      
+
       if (timeLeft.hours > 0) {
         return (
           <>
-            <span className={animateHours ? "animate-pulse-seconds" : ""}>
+            <span className={animateHours ? 'animate-pulse-seconds' : ''}>
               {formatTimeValue(timeLeft.hours)}h
             </span>
-            <span className={animateMinutes ? "animate-pulse-seconds" : ""}>
-              {" "}{formatTimeValue(timeLeft.minutes)}m
+            <span className={animateMinutes ? 'animate-pulse-seconds' : ''}>
+              {' '}
+              {formatTimeValue(timeLeft.minutes)}m
             </span>
             {showSeconds && (
-              <span className={animateSeconds ? "animate-pulse-seconds" : ""}>
-                {" "}{formatTimeValue(timeLeft.seconds)}s
+              <span className={animateSeconds ? 'animate-pulse-seconds' : ''}>
+                {' '}
+                {formatTimeValue(timeLeft.seconds)}s
               </span>
             )}
           </>
         );
       }
-      
+
       return (
         <>
-          <span className={animateMinutes ? "animate-pulse-seconds" : ""}>
+          <span className={animateMinutes ? 'animate-pulse-seconds' : ''}>
             {formatTimeValue(timeLeft.minutes)}m
           </span>
           {showSeconds && (
-            <span className={animateSeconds ? "animate-pulse-seconds" : ""}>
-              {" "}{formatTimeValue(timeLeft.seconds)}s
+            <span className={animateSeconds ? 'animate-pulse-seconds' : ''}>
+              {' '}
+              {formatTimeValue(timeLeft.seconds)}s
             </span>
           )}
         </>
@@ -240,19 +237,19 @@ export function Countdown({
       return (
         <>
           {timeLeft.days > 0 && (
-            <span className={animateDays ? "animate-pulse-seconds" : ""}>
-              {timeLeft.days}d{" "}
-            </span>
+            <span className={animateDays ? 'animate-pulse-seconds' : ''}>{timeLeft.days}d </span>
           )}
-          <span className={animateHours ? "animate-pulse-seconds" : ""}>
+          <span className={animateHours ? 'animate-pulse-seconds' : ''}>
             {formatTimeValue(timeLeft.hours)}h
           </span>
-          <span className={animateMinutes ? "animate-pulse-seconds" : ""}>
-            {" "}{formatTimeValue(timeLeft.minutes)}m
+          <span className={animateMinutes ? 'animate-pulse-seconds' : ''}>
+            {' '}
+            {formatTimeValue(timeLeft.minutes)}m
           </span>
           {showSeconds && (
-            <span className={animateSeconds ? "animate-pulse-seconds" : ""}>
-              {" "}{formatTimeValue(timeLeft.seconds)}s
+            <span className={animateSeconds ? 'animate-pulse-seconds' : ''}>
+              {' '}
+              {formatTimeValue(timeLeft.seconds)}s
             </span>
           )}
         </>
@@ -264,33 +261,31 @@ export function Countdown({
   const getTooltipContent = () => {
     if (timeLeft.isExpired) {
       if (voteStatus === 'not-voted') {
-        return "Not Voted by Agent";
+        return 'Not Voted by Agent';
       } else if (voteStatus === 'yes') {
-        return "Agent voted Yes";
+        return 'Agent voted Yes';
       } else if (voteStatus === 'no') {
-        return "Agent voted No";
+        return 'Agent voted No';
       }
     }
-    return "Time to Agent Vote";
+    return 'Time to Agent Vote';
   };
 
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge 
+          <Badge
             variant={determineBadgeVariant()}
             className={cn(
-              "select-none tabular-nums countdown-badge",
-              !timeLeft.isExpired && "relative", // Only add the indicator dot styling when not expired
+              'select-none tabular-nums countdown-badge',
+              !timeLeft.isExpired && 'relative', // Only add the indicator dot styling when not expired
               className
             )}
             {...props}
           >
             {getDisplayText()}
-            {!timeLeft.isExpired && (
-              <span className="countdown-indicator" />
-            )}
+            {!timeLeft.isExpired && <span className="countdown-indicator" />}
           </Badge>
         </TooltipTrigger>
         <TooltipContent>

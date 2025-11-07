@@ -24,7 +24,7 @@ export function useAutomaticDelegation({
   userAddress,
   chainId,
   dao,
-  agentAddress: _agentAddress,
+  agentAddress: _agentAddress, // eslint-disable-line @typescript-eslint/no-unused-vars
   setDelegating,
   setIsDelegationComplete,
   setOpen,
@@ -35,19 +35,19 @@ export function useAutomaticDelegation({
   predictAddress,
   switchToCorrectNetwork,
   onStepChange,
-  checkExistingDelegation: _checkExistingDelegation
+  checkExistingDelegation: _checkExistingDelegation, // eslint-disable-line @typescript-eslint/no-unused-vars
 }: UseAutomaticDelegationProps) {
   const [isAutoDelegationProcessActive, setIsAutoDelegationProcessActive] = useState(false);
-  
+
   const setStep = (step: string | null) => {
     if (onStepChange) {
       onStepChange(step);
     }
   };
-  
+
   const startAutomaticDelegation = async () => {
     if (!userAddress) {
-      toast.error("Please connect your wallet to delegate");
+      toast.error('Please connect your wallet to delegate');
       return;
     }
 
@@ -65,38 +65,39 @@ export function useAutomaticDelegation({
       }
 
       // 1. Predict the agent address
-      setStep("predict-address");
+      setStep('predict-address');
       const address = await predictAddress();
       if (!address || address.length !== 42) {
-        throw new Error("Failed to predict a valid agent address");
+        throw new Error('Failed to predict a valid agent address');
       }
 
       // 2. Delegate tokens
-      setStep("delegate-tokens");
+      setStep('delegate-tokens');
       const delegationSuccess = await delegateToAgent();
       if (!delegationSuccess) {
-        throw new Error("Delegation transaction failed");
+        throw new Error('Delegation transaction failed');
       }
 
-      toast.success("Delegation transaction successful!");
+      toast.success('Delegation transaction successful!');
 
       // 3. Deploy the agent (skip verification since it's already done)
-      setStep("create-agent");
+      setStep('create-agent');
       const agentSetupSuccess = await setupAgent(true); // Pass `true` to skip verification
       if (!agentSetupSuccess) {
-        throw new Error("Agent setup failed after successful delegation");
+        throw new Error('Agent setup failed after successful delegation');
       }
 
       setDelegating(false);
       setIsDelegationComplete(true);
       setShowSetupPhase(false);
 
-      setStep("complete");
-      toast.success("Automatic delegation completed successfully!");
-    } catch (err: any) {
-      console.error("Automatic delegation error:", err);
-      setError(err.message || "Automatic delegation failed");
-      toast.error(err.message || "Automatic delegation failed");
+      setStep('complete');
+      toast.success('Automatic delegation completed successfully!');
+    } catch (err) {
+      const error = err as Error;
+      console.error('Automatic delegation error:', err);
+      setError(error.message || 'Automatic delegation failed');
+      toast.error(error.message || 'Automatic delegation failed');
       setStep(null);
     } finally {
       setIsAutoDelegationProcessActive(false);
@@ -105,6 +106,6 @@ export function useAutomaticDelegation({
 
   return {
     isAutoDelegationProcessActive,
-    startAutomaticDelegation
+    startAutomaticDelegation,
   };
 }

@@ -23,9 +23,7 @@ export function GlobalLoadingIndicator() {
       <div className="flex items-center gap-3 rounded-lg border-2 border-primary/20 bg-background px-4 py-3 shadow-xl ring-2 ring-primary/10">
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
         <div className="flex flex-col">
-          <span className="text-sm font-semibold text-foreground">
-            Loading data...
-          </span>
+          <span className="text-sm font-semibold text-foreground">Loading data...</span>
           <span className="text-xs text-muted-foreground">
             {isFetching} {isFetching === 1 ? 'request' : 'requests'} in progress
           </span>

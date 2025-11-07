@@ -6,7 +6,7 @@ import {
   DialogClose,
   DialogPortal,
   DialogOverlay,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   Drawer,
   DrawerContent,
@@ -14,10 +14,10 @@ import {
   DrawerClose,
   DrawerPortal,
   DrawerOverlay,
-} from "@/components/ui/drawer";
-import { Button } from "@/components/ui/button";
-import { DelegateContent } from "@/lib/DelegateContent";
-import { X } from "lucide-react";
+} from '@/components/ui/drawer';
+import { Button } from '@/components/ui/button';
+import { DelegateContent } from '@/lib/DelegateContent';
+import { X } from 'lucide-react';
 
 interface DelegateDialogProps {
   isDesktop: boolean;
@@ -33,7 +33,7 @@ interface DelegateDialogProps {
   agentAddress: string;
   isWrongNetwork: boolean;
   isLoading: boolean;
-  tokenBalance: any;
+  tokenBalance: { value: bigint; decimals: number; formatted: string; symbol: string } | undefined;
   hasAgent: boolean;
   hasTokenBalance: boolean;
   onDelegationComplete: () => void;
@@ -106,7 +106,7 @@ export function DelegateDialog({
           <DialogContent
             className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg sm:rounded-lg"
             onEscapeKeyDown={handleClose}
-            onInteractOutside={(_event) => {
+            onInteractOutside={() => {
               // Radix UI's onInteractOutside can sometimes be too aggressive.
               // We let the DialogOverlay handle the main click-outside logic.
               // If you still need this, ensure it doesn't conflict.
@@ -118,9 +118,7 @@ export function DelegateDialog({
             <DialogHeader className="w-full text-center">
               <DialogTitle className="text-lg font-semibold">Set up Voting Agent</DialogTitle>
             </DialogHeader>
-            <div className="w-full px-2 py-4">
-              {open && renderContent()}
-            </div>
+            <div className="w-full px-2 py-4">{open && renderContent()}</div>
             <DialogClose
               onClick={handleClose}
               className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
@@ -141,7 +139,7 @@ export function DelegateDialog({
         <DrawerContent
           className="fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background"
           onEscapeKeyDown={handleClose}
-          onInteractOutside={(_event) => {
+          onInteractOutside={() => {
             // Vaul's onInteractOutside (used by Drawer) should work with the overlay.
             // console.log("DrawerContent: onInteractOutside triggered"); // DEBUG
             // Vaul's <DrawerPrimitive.Overlay /> typically handles this by calling onOpenChange.
@@ -149,14 +147,15 @@ export function DelegateDialog({
             // you might need to call handleClose() here too.
           }}
         >
-          <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" /> {/* Visual handle for drawer */}
+          <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />{' '}
+          {/* Visual handle for drawer */}
           <DrawerHeader className="text-center">
             <DialogTitle className="text-lg font-semibold">Set up Voting Agent</DialogTitle>
           </DrawerHeader>
-          <div className="p-4 overflow-auto">
-            {open && renderContent()}
-          </div>
-          <div className="w-full flex justify-end mt-auto p-4 border-t"> {/* Footer for cancel button */}
+          <div className="p-4 overflow-auto">{open && renderContent()}</div>
+          <div className="w-full flex justify-end mt-auto p-4 border-t">
+            {' '}
+            {/* Footer for cancel button */}
             <Button variant="outline" onClick={handleClose}>
               Cancel
             </Button>

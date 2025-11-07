@@ -1,4 +1,4 @@
-import { CircleFadingPlus, CircleMinus } from "lucide-react";
+import { CircleFadingPlus, CircleMinus } from 'lucide-react';
 
 interface DelegateButtonContentProps {
   hasAgent: boolean;

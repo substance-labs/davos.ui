@@ -2,22 +2,22 @@
 // IMPORTS
 // ============================================================================
 
-import { useIsMobile } from "@/hooks/use-mobile"
-import { useEffect, useState } from "react"
-import { DaoConfigItem } from "@/lib/constants"
-import { toast } from "sonner"
-import { useAccount, useBalance, useChainId, usePublicClient, useWriteContract } from "wagmi"
-import { PublicClient } from "viem"
-import { useDelegationVerification } from "@/hooks/use-delegation-verification"
-import { useAgentSetup } from '@/hooks/use-agent-setup'
-import { StopAgentConfirmation } from "@/lib/StopAgentConfirmation"
-import { DelegationVerificationDialog } from "@/lib/DelegationVerificationDialog"
-import { Button } from "@/components/ui/button"
-import { useAgents } from "@/contexts/AgentContext"
-import { DelegateDialog } from "@/lib/DelegateDialog"
-import { DelegateButtonContent } from "@/lib/DelegateButtonContent"
-import { useAutomaticDelegation } from "@/hooks/use-automatic-delegation"
-import { useStopAgent } from "@/hooks/use-stop-agent"
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useEffect, useState } from 'react';
+import { DaoConfigItem } from '@/lib/constants';
+import { toast } from 'sonner';
+import { useAccount, useBalance, useChainId, usePublicClient, useWriteContract } from 'wagmi';
+import { PublicClient } from 'viem';
+import { useDelegationVerification } from '@/hooks/use-delegation-verification';
+import { useAgentSetup } from '@/hooks/use-agent-setup';
+import { StopAgentConfirmation } from '@/lib/StopAgentConfirmation';
+import { DelegationVerificationDialog } from '@/lib/DelegationVerificationDialog';
+import { Button } from '@/components/ui/button';
+import { useAgents } from '@/contexts/AgentContext';
+import { DelegateDialog } from '@/lib/DelegateDialog';
+import { DelegateButtonContent } from '@/lib/DelegateButtonContent';
+import { useAutomaticDelegation } from '@/hooks/use-automatic-delegation';
+import { useStopAgent } from '@/hooks/use-stop-agent';
 
 // ============================================================================
 // TYPES
@@ -39,22 +39,23 @@ interface DelegateProps {
 // ============================================================================
 
 export function Delegate({ dao }: DelegateProps) {
-  const isTestMode = (import.meta as any).env?.VITE_TEST_ENV === 'true';
+  const isTestMode =
+    (import.meta as { env?: { VITE_TEST_ENV?: string } }).env?.VITE_TEST_ENV === 'true';
   const isDesktop = useIsMobile() === false;
-  
+
   // ========================================
   // Wallet & Network State
   // ========================================
-  
+
   const { address: userAddress } = useAccount();
   const chainId = useChainId();
   const publicClient = usePublicClient({ chainId: dao.chainId }) as PublicClient;
   const { writeContractAsync } = useWriteContract();
-  
+
   // ========================================
   // UI State
   // ========================================
-  
+
   const [open, setOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<string | null>(null);
   const [showSetupPhase, setShowSetupPhase] = useState(false);
@@ -62,19 +63,19 @@ export function Delegate({ dao }: DelegateProps) {
   const [isDelegationComplete, setIsDelegationComplete] = useState(false);
   const [showStopConfirmation, setShowStopConfirmation] = useState(false);
   const [showDelegationVerification, setShowDelegationVerification] = useState(false);
-  
+
   // ========================================
   // Delegation State
   // ========================================
-  
+
   const [delegating, setDelegating] = useState(false);
-  const [_delegated, setDelegated] = useState(false); // Used by useStopAgent hook
-  const [_autoDelegationConfirmed, setAutoDelegationConfirmed] = useState(false); // Used in resetDialogState
-  
+  const [, setDelegated] = useState(false); // Used by useStopAgent hook
+  const [, setAutoDelegationConfirmed] = useState(false); // Used in resetDialogState
+
   // ========================================
   // Context & Hooks
   // ========================================
-  
+
   const { hasAgent } = useAgents();
 
   // Agent setup hook - manages agent lifecycle
@@ -92,7 +93,7 @@ export function Delegate({ dao }: DelegateProps) {
     userAddress,
     publicClient,
     writeContractAsync,
-    onStepChange: setCurrentStep
+    onStepChange: setCurrentStep,
   });
 
   // Delegation verification hook - checks existing delegations
@@ -111,14 +112,11 @@ export function Delegate({ dao }: DelegateProps) {
     daoName: dao.name,
     daoChainId: dao.chainId,
     daoSource: dao.source,
-    tokenAddress: dao.tokenAddress as `0x${string}` | undefined
+    tokenAddress: dao.tokenAddress as `0x${string}` | undefined,
   });
 
   // Automatic delegation hook - handles on-chain delegation + agent setup
-  const {
-    isAutoDelegationProcessActive,
-    startAutomaticDelegation
-  } = useAutomaticDelegation({
+  const { isAutoDelegationProcessActive, startAutomaticDelegation } = useAutomaticDelegation({
     userAddress,
     chainId,
     dao,
@@ -133,9 +131,9 @@ export function Delegate({ dao }: DelegateProps) {
     predictAddress,
     switchToCorrectNetwork,
     onStepChange: setCurrentStep,
-    checkExistingDelegation
+    checkExistingDelegation,
   });
-  
+
   // Stop agent hook - handles agent removal and delegation revocation
   const { stopAgent: handleStopAgent } = useStopAgent({
     userAddress,
@@ -148,28 +146,34 @@ export function Delegate({ dao }: DelegateProps) {
     setError,
     stopAgentAndRevoke,
     stopAgentOnly,
-    switchToCorrectNetwork
+    switchToCorrectNetwork,
   });
 
   // Token balance query
-  const { data: tokenBalance, isError, isLoading: isBalanceLoading } = useBalance({
+  const {
+    data: tokenBalance,
+    isError,
+    isLoading: isBalanceLoading,
+  } = useBalance({
     address: userAddress,
     token: dao.tokenAddress as `0x${string}`,
     chainId: dao.chainId,
-  }) as { data?: TokenBalanceData, isError: boolean, isLoading: boolean };
+  }) as { data?: TokenBalanceData; isError: boolean; isLoading: boolean };
 
   // ========================================
   // Computed Values
   // ========================================
-  
-  const isAutomaticFlow = (dao as any).flow === "automatic";
-  const isLoading = isTestMode ? false : (isAgentLoading || isDelegationLoading);
-  const hasTokenBalance = isTestMode ? true : Boolean(!isError && tokenBalance && tokenBalance.value > 0n);
-  
+
+  const isAutomaticFlow = (dao as { flow?: string }).flow === 'automatic';
+  const isLoading = isTestMode ? false : isAgentLoading || isDelegationLoading;
+  const hasTokenBalance = isTestMode
+    ? true
+    : Boolean(!isError && tokenBalance && tokenBalance.value > 0n);
+
   // ========================================
   // Side Effects
   // ========================================
-  
+
   // Sync agent error to delegation error state
   useEffect(() => {
     if (agentError) {
@@ -180,7 +184,7 @@ export function Delegate({ dao }: DelegateProps) {
   // ========================================
   // Helper Functions
   // ========================================
-  
+
   /**
    * Resets all dialog and flow state to initial values
    */
@@ -199,14 +203,14 @@ export function Delegate({ dao }: DelegateProps) {
    */
   const ensureAgentAddressPredicted = async (): Promise<boolean> => {
     if (agentAddress) return true;
-    
+
     const predictedAddress = await predictAddress();
-    
+
     if (!predictedAddress) {
-      toast.error("Failed to predict agent address");
+      toast.error('Failed to predict agent address');
       return false;
     }
-    
+
     return true;
   };
 
@@ -216,7 +220,11 @@ export function Delegate({ dao }: DelegateProps) {
   const handleNetworkSwitchAndStartFlow = async () => {
     // Already on correct network - start flow immediately
     if (chainId === dao.chainId) {
-      isAutomaticFlow ? startAutomaticDelegation() : setOpen(true);
+      if (isAutomaticFlow) {
+        startAutomaticDelegation();
+      } else {
+        setOpen(true);
+      }
       return;
     }
 
@@ -225,19 +233,23 @@ export function Delegate({ dao }: DelegateProps) {
     try {
       const switched = await switchToCorrectNetwork();
       if (switched) {
-        isAutomaticFlow ? startAutomaticDelegation() : setOpen(true);
+        if (isAutomaticFlow) {
+          startAutomaticDelegation();
+        } else {
+          setOpen(true);
+        }
       }
-    } catch (err) {
+    } catch {
       toast.error(`Failed to switch to ${dao.name} network`);
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   // ========================================
   // Event Handlers
   // ========================================
-  
+
   /**
    * Main button click handler - determines flow based on agent existence
    */
@@ -250,7 +262,7 @@ export function Delegate({ dao }: DelegateProps) {
 
     // Validate wallet connection
     if (!userAddress) {
-      toast.error("Please connect your wallet first");
+      toast.error('Please connect your wallet first');
       return;
     }
 
@@ -324,11 +336,11 @@ export function Delegate({ dao }: DelegateProps) {
 
   return (
     <>
-      <Button 
+      <Button
         variant="outline"
         onClick={handleButtonClick}
         disabled={isLoading || isBalanceLoading}
-        className={isDesktop ? "min-w-[140px]" : "w-full"}
+        className={isDesktop ? 'min-w-[140px]' : 'w-full'}
       >
         <DelegateButtonContent hasAgent={hasAgent(dao)} />
       </Button>
@@ -343,7 +355,7 @@ export function Delegate({ dao }: DelegateProps) {
         }}
       />
 
-      <DelegationVerificationDialog 
+      <DelegationVerificationDialog
         open={showDelegationVerification}
         onOpenChange={setShowDelegationVerification}
         delegationExists={delegationExists}

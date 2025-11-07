@@ -1,19 +1,23 @@
-import { OpenAI } from 'openai'
+import { OpenAI } from 'openai';
 import { DAVOS_API_ENDPOINT } from './constants';
 
-export async function fetchOpenAIResponseDirectly(directive: string, proposal: string): Promise<string> {
+export async function fetchOpenAIResponseDirectly(
+  directive: string,
+  proposal: string
+): Promise<string> {
   // Use test mode adapter if VITE_TEST_ENV is true
-  const isTestMode = (import.meta as any).env?.VITE_TEST_ENV === 'true';
+  const isTestMode =
+    (import.meta as { env?: { VITE_TEST_ENV?: string } }).env?.VITE_TEST_ENV === 'true';
   if (isTestMode) {
     // Mock response for test environment
-    console.log(`[TEST MODE] Mocking OpenAI response for directive: ${directive.substring(0, 50)}...`);
+    console.info(
+      `[TEST MODE] Mocking OpenAI response for directive: ${directive.substring(0, 50)}...`
+    );
     return `Mock AI summary for test environment. This is a simulated response for: ${proposal.substring(0, 100)}...`;
   }
 
-  // const OpenAI = (await import('openai')).OpenAI;
-  
   const openai = new OpenAI({
-    apiKey: (import.meta as any).env.VITE_OPENAI_API_KEY,
+    apiKey: (import.meta as { env?: { VITE_OPENAI_API_KEY?: string } }).env?.VITE_OPENAI_API_KEY,
     dangerouslyAllowBrowser: true,
   });
 
@@ -25,9 +29,10 @@ export async function fetchOpenAIResponseDirectly(directive: string, proposal: s
         { role: 'user', content: proposal },
       ],
     });
-    
+
     return response.choices[0].message.content || '';
-  } catch (error: any) {
+  } catch (err) {
+    const error = err as Error;
     console.error('Error:', error);
     throw error; // Propagate error for React Query to handle
   }
@@ -35,10 +40,13 @@ export async function fetchOpenAIResponseDirectly(directive: string, proposal: s
 
 export async function fetchOpenAIResponse(directive: string, proposal: string): Promise<string> {
   // Use test mode adapter if VITE_TEST_ENV is true
-  const isTestMode = (import.meta as any).env?.VITE_TEST_ENV === 'true';
+  const isTestMode =
+    (import.meta as { env?: { VITE_TEST_ENV?: string } }).env?.VITE_TEST_ENV === 'true';
   if (isTestMode) {
     // Mock response for test environment
-    console.log(`[TEST MODE] Mocking Davos AI response for directive: ${directive.substring(0, 50)}...`);
+    console.info(
+      `[TEST MODE] Mocking Davos AI response for directive: ${directive.substring(0, 50)}...`
+    );
     return `Mock Davos AI summary for test environment. This is a simulated response for: ${proposal.substring(0, 100)}...`;
   }
 
@@ -47,11 +55,11 @@ export async function fetchOpenAIResponse(directive: string, proposal: string): 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true'
+        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({
         directive: directive,
-        proposal: proposal
+        proposal: proposal,
       }),
     });
 
@@ -64,9 +72,10 @@ export async function fetchOpenAIResponse(directive: string, proposal: string): 
     if (!data.response) {
       return 'Error fetching Davos response';
     }
-    
+
     return data.response;
-  } catch (error: any) {
+  } catch (err) {
+    const error = err as Error;
     console.error('Error:', error);
     throw error; // Propagate error for React Query to handle
   }

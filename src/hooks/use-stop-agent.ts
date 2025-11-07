@@ -16,7 +16,7 @@ interface UseStopAgentProps {
 }
 
 export function useStopAgent({
-  userAddress: _userAddress,
+  userAddress: _userAddress, // eslint-disable-line @typescript-eslint/no-unused-vars
   chainId,
   daoName,
   daoChainId,
@@ -26,7 +26,7 @@ export function useStopAgent({
   setError,
   stopAgentAndRevoke,
   stopAgentOnly,
-  switchToCorrectNetwork
+  switchToCorrectNetwork,
 }: UseStopAgentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -45,16 +45,19 @@ export function useStopAgent({
       }
 
       const success = revokeDelegation ? await stopAgentAndRevoke() : await stopAgentOnly();
-      
+
       if (success) {
         setDelegated(false);
         setShowStopConfirmation(false);
-        toast.success(revokeDelegation ? "Agent stopped and delegation revoked!" : "Agent stopped!");
+        toast.success(
+          revokeDelegation ? 'Agent stopped and delegation revoked!' : 'Agent stopped!'
+        );
       }
       return success;
-    } catch (err: any) {
-      setError("Stop failed: " + (err?.message || "Unknown error"));
-      toast.error("Stop failed: " + (err?.message || "Unknown error"));
+    } catch (err) {
+      const error = err as Error;
+      setError('Stop failed: ' + (error?.message || 'Unknown error'));
+      toast.error('Stop failed: ' + (error?.message || 'Unknown error'));
       return false;
     } finally {
       setIsProcessing(false);
@@ -64,6 +67,6 @@ export function useStopAgent({
 
   return {
     isProcessing,
-    stopAgent
+    stopAgent,
   };
 }

@@ -1,16 +1,16 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useAccount } from 'wagmi'
-import Ethos from "./components/Ethos"
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAccount } from 'wagmi';
+import Ethos from './components/Ethos';
 
 function Profile() {
-  const account = useAccount()
+  const account = useAccount();
   // const { ethos, setEthos } = useEthos();
-  
+
   // const handleEthosSelect = (selectedEthos: string, isCustom: boolean, customText?: string) => {
   //   // If it's a custom ethos, use the custom text
   //   // Otherwise use the selected ethos title as the ethos
   //   const newEthos = isCustom && customText ? customText : selectedEthos;
-    
+
   //   setEthos(newEthos);
   //   toast("Ethos", {
   //     description: "Ethos updated successfully",
@@ -25,12 +25,12 @@ function Profile() {
             <CardTitle>Profile Info</CardTitle>
           </CardHeader>
           <CardContent>
-          Address: {account.address}
+            Address: {account.address}
             <br />
-          Status: {account.status}
+            Status: {account.status}
           </CardContent>
         </Card>
-        
+
         <Card className="mx-4 lg:mx-6">
           <CardContent>
             <Ethos />
@@ -38,7 +38,7 @@ function Profile() {
         </Card>
       </div>
     </div>
-  )
+  );
 }
 
-export default Profile
+export default Profile;

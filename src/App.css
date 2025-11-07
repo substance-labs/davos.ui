@@ -16,12 +16,12 @@ body {
     --spacing: 0.222222rem;
   }
 
-  [data-slot="card"] {
+  [data-slot='card'] {
     --spacing: 0.16rem;
   }
 
-  [data-slot="select-trigger"],
-  [data-slot="toggle-group-item"] {
+  [data-slot='select-trigger'],
+  [data-slot='toggle-group-item'] {
     --spacing: 0.222222rem;
   }
 }
@@ -98,8 +98,8 @@ body {
     @apply !shadow-none;
   }
 
-  [data-slot="toggle-group"],
-  [data-slot="toggle-group-item"] {
+  [data-slot='toggle-group'],
+  [data-slot='toggle-group-item'] {
     @apply !rounded-none !shadow-none;
   }
 }
@@ -126,14 +126,31 @@ body {
 }
 
 @keyframes pulseText {
-  0% { opacity: 0.6; }
-  50% { opacity: 1; transform: scale(1.05); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* New animation for the continuously pulsing dot */
 @keyframes pulse-dot {
-  0% { opacity: 0.2; transform: scale(0.8); }
-  50% { opacity: 0.8; transform: scale(1.2); }
-  100% { opacity: 0.2; transform: scale(0.8); }
+  0% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
 }

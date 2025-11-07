@@ -1,16 +1,19 @@
-import { TALLY_API_URL, TALLY_API_KEY } from "./constants";
+import { TALLY_API_URL, TALLY_API_KEY } from './constants';
 
 // Simple in-memory cache for Tally API calls to avoid rate limiting
-const tallyGraphQLCache = new Map<string, { data: any, timestamp: number }>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const tallyGraphQLCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Request queue to prevent concurrent API calls
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let requestQueue: Promise<any> = Promise.resolve();
 const REQUEST_DELAY = 1000; // 1 second between requests
 
 /**
  * Generate cache key from query and variables
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getCacheKey(query: string, variables: Record<string, any>): string {
   return `${query.substring(0, 50)}_${JSON.stringify(variables)}`;
 }
@@ -116,8 +119,10 @@ export const TALLY_DELEGATION_QUERY = `
 /**
  * Base Tally GraphQL fetch function with queuing to prevent rate limits
  */
+
 export async function fetchTallyGraphQL(
   query: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   variables: Record<string, any> = {}
 ) {
   if (!TALLY_API_KEY) {
@@ -127,7 +132,7 @@ export async function fetchTallyGraphQL(
   // Check cache first
   const cacheKey = getCacheKey(query, variables);
   const cached = tallyGraphQLCache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data;
   }
 
@@ -135,7 +140,6 @@ export async function fetchTallyGraphQL(
   return new Promise((resolve, reject) => {
     requestQueue = requestQueue.then(async () => {
       try {
-        
         const response = await fetch(TALLY_API_URL, {
           method: 'POST',
           headers: {
@@ -154,6 +158,7 @@ export async function fetchTallyGraphQL(
           throw new Error(`HTTP error! Status: ${response.status} - ${responseText}`);
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let data: any;
         try {
           data = JSON.parse(responseText);
@@ -163,6 +168,7 @@ export async function fetchTallyGraphQL(
 
         if (data.errors) {
           throw new Error(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             `GraphQL error: ${data.errors.map((e: any) => e.message).join(', ')}`
           );
         }
@@ -172,7 +178,7 @@ export async function fetchTallyGraphQL(
 
         // Add delay before next request
         await delay(REQUEST_DELAY);
-        
+
         resolve(data.data);
       } catch (error) {
         console.error('Error fetching Tally GraphQL data:', error);
@@ -198,17 +204,16 @@ export async function fetchTallyGovernor(governorId: string) {
 /**
  * Fetch all proposals with pagination
  */
-export async function fetchAllTallyProposals(
-  governorId: string,
-  limit: number = 1000
-) {
+export async function fetchAllTallyProposals(governorId: string, limit: number = 1000) {
   const maxPerPage = 20; // PageInput hard limit per docs
   const cappedLimit = Math.min(limit, 1000);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const proposals: any[] = [];
   let cursor: string | undefined;
 
   while (proposals.length < cappedLimit) {
     const currentPageSize = Math.min(maxPerPage, cappedLimit - proposals.length);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const page: Record<string, any> = { limit: currentPageSize };
     if (cursor) {
       page.afterCursor = cursor;
@@ -232,8 +237,8 @@ export async function fetchAllTallyProposals(
 
     proposals.push(...nodes);
 
-  const pageInfo = result?.proposals?.pageInfo;
-  cursor = pageInfo?.lastCursor;
+    const pageInfo = result?.proposals?.pageInfo;
+    cursor = pageInfo?.lastCursor;
 
     if (!cursor || nodes.length < currentPageSize) {
       break;
@@ -246,10 +251,7 @@ export async function fetchAllTallyProposals(
 /**
  * Fetch delegation information
  */
-export async function fetchTallyDelegation(
-  delegator: string,
-  governorId: string
-) {
+export async function fetchTallyDelegation(delegator: string, governorId: string) {
   const result = await fetchTallyGraphQL(TALLY_DELEGATION_QUERY, {
     input: {
       delegator,

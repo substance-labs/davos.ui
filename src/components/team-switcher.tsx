@@ -1,5 +1,5 @@
-import * as React from "react"
-import { Plus, MountainSnow } from "lucide-react"
+import * as React from 'react';
+import { Plus, MountainSnow } from 'lucide-react';
 
 import {
   DropdownMenu,
@@ -8,27 +8,23 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
-} from "@/components/ui/dropdown-menu"
-import {
-  SidebarMenu,
-  SidebarMenuItem,
-  useSidebar,
-} from "@/components/ui/sidebar"
+} from '@/components/ui/dropdown-menu';
+import { SidebarMenu, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 
 export function TeamSwitcher({
   teams,
 }: {
   teams: {
-    name: string
-    logo: React.ElementType
-    plan: string
-  }[]
+    name: string;
+    logo: React.ElementType;
+    plan: string;
+  }[];
 }) {
-  const { isMobile } = useSidebar()
-  const [activeTeam, setActiveTeam] = React.useState(teams[0])
+  const { isMobile } = useSidebar();
+  const [activeTeam, setActiveTeam] = React.useState(teams[0]);
 
   if (!activeTeam) {
-    return null
+    return null;
   }
 
   return (
@@ -55,20 +51,18 @@ export function TeamSwitcher({
           <DropdownMenuContent
             className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
             align="start"
-            side={isMobile ? "bottom" : "right"}
+            side={isMobile ? 'bottom' : 'right'}
             sideOffset={4}
           >
             <DropdownMenuItem
-                key={'Dashboard'}
-                onClick={() => setActiveTeam(teams[0])}
-                className="gap-2 p-2"
-              >
-                <div className="flex size-6 items-center justify-center rounded-md border">
-                  <MountainSnow className="size-3.5 shrink-0" />
-                </div>
-                <div className="font-semibold">
-                  Dashboard
-                </div>
+              key={'Dashboard'}
+              onClick={() => setActiveTeam(teams[0])}
+              className="gap-2 p-2"
+            >
+              <div className="flex size-6 items-center justify-center rounded-md border">
+                <MountainSnow className="size-3.5 shrink-0" />
+              </div>
+              <div className="font-semibold">Dashboard</div>
               <DropdownMenuShortcut>⌘{1}</DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuLabel className="text-muted-foreground text-xs">
@@ -98,5 +92,5 @@ export function TeamSwitcher({
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }

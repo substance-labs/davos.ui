@@ -1,11 +1,6 @@
-import { AlertCircle } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { AlertCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface DelegationVerificationDialogProps {
   open: boolean;
@@ -31,9 +26,7 @@ export function DelegationVerificationDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {delegationExists 
-              ? "Existing Delegation Found" 
-              : "No Delegation Found"}
+            {delegationExists ? 'Existing Delegation Found' : 'No Delegation Found'}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
@@ -42,23 +35,18 @@ export function DelegationVerificationDialog({
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-yellow-500" />
                 <p>
-                  You already have an existing delegation for {daoName}.
-                  Delegated to: <span className="font-mono text-xs">{delegationTarget}</span>
+                  You already have an existing delegation for {daoName}. Delegated to:{' '}
+                  <span className="font-mono text-xs">{delegationTarget}</span>
                 </p>
               </div>
               <p className="text-sm text-muted-foreground">
                 Do you want to continue with the manual verification process anyway?
               </p>
               <div className="flex justify-end gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={onClose}
-                >
+                <Button variant="outline" onClick={onClose}>
                   No
                 </Button>
-                <Button onClick={onContinue}>
-                  Yes, Continue
-                </Button>
+                <Button onClick={onContinue}>Yes, Continue</Button>
               </div>
             </>
           ) : (
@@ -66,14 +54,12 @@ export function DelegationVerificationDialog({
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-red-500" />
                 <p>
-                  No delegation has been found for {daoName}.
-                  You need to complete delegation before proceeding with the manual verification.
+                  No delegation has been found for {daoName}. You need to complete delegation before
+                  proceeding with the manual verification.
                 </p>
               </div>
               <div className="flex justify-end">
-                <Button onClick={onClose}>
-                  Close
-                </Button>
+                <Button onClick={onClose}>Close</Button>
               </div>
             </>
           )}

@@ -1,4 +1,4 @@
-import { SectionCards } from "@/components/section-cards"
+import { SectionCards } from '@/components/section-cards';
 
 function Explorer() {
   return (
@@ -7,7 +7,7 @@ function Explorer() {
         <SectionCards />
       </div>
     </div>
-  )
+  );
 }
 
-export default Explorer
+export default Explorer;

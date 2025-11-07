@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button"
-import { CircleFadingPlus, CircleMinus } from "lucide-react"
-import { toast } from "sonner"
+import { Button } from '@/components/ui/button';
+import { CircleFadingPlus, CircleMinus } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface DelegateButtonProps {
   hasAgent: boolean;
@@ -39,7 +39,6 @@ export function DelegateButton({
   setError,
   setIsLoading,
 }: DelegateButtonProps) {
-  
   const renderButtonContent = () => {
     return hasAgent ? (
       <>
@@ -61,13 +60,13 @@ export function DelegateButton({
     }
 
     if (!userAddress) {
-      toast.error("Please connect your wallet first");
+      toast.error('Please connect your wallet first');
       return;
     }
 
     setCurrentStep(null);
     setError(null);
-    
+
     if (chainId !== daoChainId) {
       setIsLoading(true);
       try {
@@ -79,7 +78,7 @@ export function DelegateButton({
             onOpenDialog();
           }
         }
-      } catch (err: any) {
+      } catch {
         toast.error(`Failed to switch to ${daoName} network`);
       } finally {
         setIsLoading(false);
@@ -94,11 +93,11 @@ export function DelegateButton({
   };
 
   return (
-    <Button 
+    <Button
       variant="outline"
       onClick={handleButtonClick}
       disabled={isLoading || isBalanceLoading}
-      className={isDesktop ? "min-w-[140px]" : "w-full"}
+      className={isDesktop ? 'min-w-[140px]' : 'w-full'}
     >
       {renderButtonContent()}
     </Button>

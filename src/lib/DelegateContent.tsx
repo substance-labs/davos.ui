@@ -1,7 +1,7 @@
-import { DelegationSuccessContent } from "@/lib/DelegationSuccessContent";
-import { SetupStepper } from "@/lib/SetupStepper";
-import { ManualDelegationContent } from "@/lib/ManualDelegationContent";
-import { ExistingBalanceContent } from "@/lib/ExistingBalanceContent";
+import { DelegationSuccessContent } from '@/lib/DelegationSuccessContent';
+import { SetupStepper } from '@/lib/SetupStepper';
+import { ManualDelegationContent } from '@/lib/ManualDelegationContent';
+import { ExistingBalanceContent } from '@/lib/ExistingBalanceContent';
 
 interface DelegateContentProps {
   isDelegationComplete: boolean;
@@ -14,7 +14,7 @@ interface DelegateContentProps {
   agentAddress: string;
   isWrongNetwork: boolean;
   isLoading: boolean;
-  tokenBalance: any;
+  tokenBalance: { value: bigint; decimals: number; formatted: string; symbol: string } | undefined;
   hasAgent: boolean;
   hasTokenBalance: boolean;
   onDelegationComplete: () => void;

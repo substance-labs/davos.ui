@@ -10,41 +10,41 @@ export const logger = {
   /**
    * Log debug information (only in development or when debug is enabled)
    */
-  debug: (...args: any[]) => {
+  debug: (...args: unknown[]) => {
     if (isDevelopment || isDebugEnabled) {
-      console.log('[DEBUG]', ...args);
+      console.info('[DEBUG]', ...args);
     }
   },
 
   /**
    * Log informational messages
    */
-  info: (...args: any[]) => {
+  info: (...args: unknown[]) => {
     if (isDevelopment || isDebugEnabled) {
-      console.log('[INFO]', ...args);
+      console.info('[INFO]', ...args);
     }
   },
 
   /**
    * Log warnings (always shown)
    */
-  warn: (...args: any[]) => {
+  warn: (...args: unknown[]) => {
     console.warn('[WARN]', ...args);
   },
 
   /**
    * Log errors (always shown)
    */
-  error: (...args: any[]) => {
+  error: (...args: unknown[]) => {
     console.error('[ERROR]', ...args);
   },
 
   /**
    * Log test mode operations
    */
-  testMode: (message: string, ...args: any[]) => {
+  testMode: (message: string, ...args: unknown[]) => {
     if (isDevelopment || isDebugEnabled) {
-      console.log('[TEST MODE]', message, ...args);
+      console.info('[TEST MODE]', message, ...args);
     }
-  }
+  },
 };

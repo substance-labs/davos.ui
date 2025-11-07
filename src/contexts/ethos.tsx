@@ -21,32 +21,35 @@ const EthosContext = createContext<EthosContextType | undefined>(undefined);
  */
 function parseEthosData(data: unknown): string {
   if (!data) return '';
-  
+
   // Handle struct with 'ethos' field
   if (typeof data === 'object' && data !== null && 'ethos' in data) {
     return String(data.ethos);
   }
-  
+
   // Handle direct string
   if (typeof data === 'string') {
     return data;
   }
-  
+
   // Handle array/tuple format
   if (Array.isArray(data) && data.length > 0) {
     return typeof data[0] === 'string' ? data[0] : '';
   }
-  
+
   return '';
 }
 
 /**
  * Checks if error is a user rejection
  */
-function isUserRejection(error: any): boolean {
-  return error.message?.includes('User rejected') || 
-         error.message?.includes('User denied') ||
-         error.cause?.message?.includes('User rejected');
+function isUserRejection(error: unknown): boolean {
+  const err = error as { message?: string; cause?: { message?: string } };
+  return !!(
+    err.message?.includes('User rejected') ||
+    err.message?.includes('User denied') ||
+    err.cause?.message?.includes('User rejected')
+  );
 }
 
 export function EthosProvider({ children }: { children: ReactNode }) {
@@ -55,9 +58,13 @@ export function EthosProvider({ children }: { children: ReactNode }) {
   const { switchChainAsync } = useSwitchChain();
   const [ethos, setEthosState] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Fetch user ethos from Polygon
-  const { data: userEthosData, isLoading: isEthosLoading, refetch } = useReadContract({
+  const {
+    data: userEthosData,
+    isLoading: isEthosLoading,
+    refetch,
+  } = useReadContract({
     address: DELEGATE_CONTRACT_ADDRESS,
     abi: DeleGateABI.abi,
     functionName: 'getUserEthos',
@@ -76,7 +83,7 @@ export function EthosProvider({ children }: { children: ReactNode }) {
       setEthosState('');
     }
   }, [address, refetch]);
-  
+
   // Parse and set ethos data
   useEffect(() => {
     if (userEthosData) {
@@ -89,22 +96,22 @@ export function EthosProvider({ children }: { children: ReactNode }) {
    */
   async function ensurePolygonNetwork(): Promise<void> {
     if (chainId === POLYGON_CHAIN_ID) return;
-    
-    const toastId = toast.loading("Switching to Polygon network...");
-    
+
+    const toastId = toast.loading('Switching to Polygon network...');
+
     try {
       await switchChainAsync({ chainId: POLYGON_CHAIN_ID });
       toast.dismiss(toastId);
-      toast.success("Switched to Polygon network");
-    } catch (error: any) {
+      toast.success('Switched to Polygon network');
+    } catch (error) {
       toast.dismiss(toastId);
-      
+
       if (isUserRejection(error)) {
-        toast.info("Network switch cancelled");
+        toast.info('Network switch cancelled');
       } else {
-        toast.error("Failed to switch to Polygon network");
+        toast.error('Failed to switch to Polygon network');
       }
-      
+
       throw error;
     }
   }
@@ -119,9 +126,9 @@ export function EthosProvider({ children }: { children: ReactNode }) {
       functionName: 'defineEthos',
       args: [{ ethos: value }],
       chainId: POLYGON_CHAIN_ID,
-      ...config
+      ...config,
     });
-    
+
     return hash;
   }
 
@@ -129,18 +136,18 @@ export function EthosProvider({ children }: { children: ReactNode }) {
    * Wait for transaction and update state
    */
   async function confirmTransaction(hash: string, value: string): Promise<void> {
-    const toastId = toast.loading("Waiting for transaction confirmation...");
-    
+    const toastId = toast.loading('Waiting for transaction confirmation...');
+
     try {
       const result = await waitForTransactionReceipt(config, { hash: hash as `0x${string}` });
-      
+
       if (result.status === 'success') {
         toast.dismiss(toastId);
         setEthosState(value);
-        toast.success("Your ethos has been successfully saved on-chain");
+        toast.success('Your ethos has been successfully saved on-chain');
       } else {
         toast.dismiss(toastId);
-        toast.error("Transaction failed");
+        toast.error('Transaction failed');
         throw new Error(`Transaction failed with status: ${result.status}`);
       }
     } catch (error) {
@@ -154,7 +161,7 @@ export function EthosProvider({ children }: { children: ReactNode }) {
    */
   async function updateEthos(value: string): Promise<string | undefined> {
     if (!address) {
-      toast.error("Please connect your wallet first");
+      toast.error('Please connect your wallet first');
       return undefined;
     }
 
@@ -169,15 +176,15 @@ export function EthosProvider({ children }: { children: ReactNode }) {
       const hash = await writeEthosToChain(value);
       await confirmTransaction(hash, value);
       return hash;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to update ethos:', error);
-      
+
       if (isUserRejection(error)) {
-        toast.info("Transaction was cancelled");
+        toast.info('Transaction was cancelled');
       } else {
-        toast.error("Failed to update your ethos. Please try again.");
+        toast.error('Failed to update your ethos. Please try again.');
       }
-      
+
       throw error;
     } finally {
       setIsLoading(false);

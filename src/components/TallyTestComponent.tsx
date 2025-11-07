@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 export function TallyTestComponent() {
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleRunTests = async () => {
@@ -14,8 +14,8 @@ export function TallyTestComponent() {
       // const result = await runTallyTests();
       // setResults(result);
       setError('Tests are currently disabled - missing test file');
-    } catch (err: any) {
-      setError(err.message || 'Test failed');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Test failed');
     } finally {
       setLoading(false);
     }
@@ -28,8 +28,8 @@ export function TallyTestComponent() {
       // const isValid = await testAPIKey();
       // setResults({ apiKeyValid: isValid });
       setError('Tests are currently disabled - missing test file');
-    } catch (err: any) {
-      setError(err.message || 'API Key test failed');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'API Key test failed');
     } finally {
       setLoading(false);
     }
@@ -42,8 +42,8 @@ export function TallyTestComponent() {
       // testDataNormalization();
       // setResults({ normalizationTested: true });
       setError('Tests are currently disabled - missing test file');
-    } catch (err: any) {
-      setError(err.message || 'Normalization test failed');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Normalization test failed');
     } finally {
       setLoading(false);
     }
@@ -52,7 +52,7 @@ export function TallyTestComponent() {
   return (
     <div className="p-6 bg-gray-50 rounded-lg border border-gray-200">
       <h2 className="text-2xl font-bold mb-4">Tally Integration - Phase 1 Tests</h2>
-      
+
       <div className="space-y-4">
         <button
           onClick={handleTestAPIKey}

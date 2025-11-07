@@ -1,26 +1,9 @@
-import { http, createConfig } from 'wagmi'
-import { 
-  mainnet, 
-  arbitrum, 
-  optimism, 
-  polygon,
-  base,
-  sepolia,
-  gnosis
-} from 'wagmi/chains'
+import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { mainnet, arbitrum, optimism, polygon, base, sepolia, gnosis } from 'wagmi/chains';
 
-// Create transports for each chain
-const transports = {
-  [mainnet.id]: http(),
-  [arbitrum.id]: http(),
-  [optimism.id]: http(),
-  [polygon.id]: http(),
-  [base.id]: http(),
-  [sepolia.id]: http(),
-  [gnosis.id]: http()
-}
-
-export const config = createConfig({
+export const config = getDefaultConfig({
+  appName: 'Davos',
+  projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID',
   chains: [mainnet, arbitrum, optimism, polygon, base, sepolia, gnosis],
-  transports
-})
+  ssr: false,
+});

@@ -1,39 +1,37 @@
-"use client"
+'use client';
 
 // import { PolarAngleAxis, PolarGrid, Radar, RadarChart } from "recharts"
-import { PolarGrid, RadialBar, RadialBarChart } from "recharts"
+import { PolarGrid, RadialBar, RadialBarChart } from 'recharts';
 
-import {
-  CardContent,
-} from "@/components/ui/card"
+import { CardContent } from '@/components/ui/card';
 import {
   ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from "@/components/ui/chart"
+} from '@/components/ui/chart';
 
 const chartConfig = {
   visitors: {
-    label: "Visitors",
+    label: 'Visitors',
   },
   chrome: {
-    label: "Active Voting Weight",
-    color: "hsl(var(--chart-1))",
+    label: 'Active Voting Weight',
+    color: 'hsl(var(--chart-1))',
   },
   safari: {
-    label: "Active Voters %",
-    color: "hsl(var(--chart-2))",
+    label: 'Active Voters %',
+    color: 'hsl(var(--chart-2))',
   },
   edge: {
-    label: "Activity Score",
-    color: "hsl(var(--chart-4))",
+    label: 'Activity Score',
+    color: 'hsl(var(--chart-4))',
   },
   other: {
-    label: "Participation Effort Score",
-    color: "hsl(var(--chart-5))",
+    label: 'Participation Effort Score',
+    color: 'hsl(var(--chart-5))',
   },
-} satisfies ChartConfig
+} satisfies ChartConfig;
 
 export interface ChartPropsData {
   users: number;
@@ -44,7 +42,6 @@ export interface ChartPropsData {
 }
 
 export function ChartProps({ users, proposals, timePerDay, votes }: ChartPropsData) {
-  
   // const chartData = [
   //   { month: "Users", desktop: users },
   //   { month: "Proposals", desktop: proposals },
@@ -54,20 +51,17 @@ export function ChartProps({ users, proposals, timePerDay, votes }: ChartPropsDa
   // ]
 
   const chartData = [
-    { browser: "chrome", visitors: users, fill: "#8884d8" },
-    { browser: "safari", visitors: proposals, fill: "#82ca9d" },
+    { browser: 'chrome', visitors: users, fill: '#8884d8' },
+    { browser: 'safari', visitors: proposals, fill: '#82ca9d' },
     // { browser: "firefox", visitors: totalTime, fill: "var(--color-firefox)" },
-    { browser: "edge", visitors: timePerDay, fill: "#ffc658" },
-    { browser: "other", visitors: votes, fill: "#ff7300" },
-  ]
-        
+    { browser: 'edge', visitors: timePerDay, fill: '#ffc658' },
+    { browser: 'other', visitors: votes, fill: '#ff7300' },
+  ];
+
   return (
-  <CardContent className="flex-1 pb-0">
-    <ChartContainer
-    config={chartConfig}
-    className="mx-auto aspect-square max-h-[250px]"
-    >
-      {/* <RadarChart data={chartData}>
+    <CardContent className="flex-1 pb-0">
+      <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
+        {/* <RadarChart data={chartData}>
         <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
         <PolarAngleAxis 
           dataKey="month" 
@@ -102,15 +96,15 @@ export function ChartProps({ users, proposals, timePerDay, votes }: ChartPropsDa
           fillOpacity={0.6}
         />
       </RadarChart> */}
-      <RadialBarChart data={chartData} innerRadius={20} outerRadius={100}>
-        <ChartTooltip
-          cursor={false}
-          content={<ChartTooltipContent hideLabel nameKey="browser" />}
-        />
-        <PolarGrid gridType="circle" />
-        <RadialBar dataKey="visitors" />
-      </RadialBarChart>
-    </ChartContainer>
-  </CardContent>   
-  )
+        <RadialBarChart data={chartData} innerRadius={20} outerRadius={100}>
+          <ChartTooltip
+            cursor={false}
+            content={<ChartTooltipContent hideLabel nameKey="browser" />}
+          />
+          <PolarGrid gridType="circle" />
+          <RadialBar dataKey="visitors" />
+        </RadialBarChart>
+      </ChartContainer>
+    </CardContent>
+  );
 }

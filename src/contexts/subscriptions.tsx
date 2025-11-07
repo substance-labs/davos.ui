@@ -4,12 +4,12 @@ import { useAccount } from 'wagmi';
 
 // Define the structure of a subscription
 export interface Subscription {
-  dao: DaoConfigItem
+  dao: DaoConfigItem;
 }
 
 // Interface for subscriptions storage by account
 interface AccountSubscriptions {
-  [address: string]: Subscription[]
+  [address: string]: Subscription[];
 }
 
 // Define the context shape
@@ -36,27 +36,27 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
   const { address } = useAccount();
   const [allSubscriptions, setAllSubscriptions] = useState<AccountSubscriptions>(() => {
     if (typeof window === 'undefined') return {};
-    
+
     // Load all subscription data
     try {
       const saved = localStorage.getItem('allDaoSubscriptions');
       return saved ? JSON.parse(saved) : {};
     } catch (error) {
-      console.error("Failed to parse subscriptions from localStorage:", error);
+      console.error('Failed to parse subscriptions from localStorage:', error);
       return {};
     }
   });
-  
+
   // Get current user's subscriptions
-  const currentSubscriptions = address ? (allSubscriptions[address] || []) : [];
-  
+  const currentSubscriptions = address ? allSubscriptions[address] || [] : [];
+
   // Save to localStorage whenever subscriptions change
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('allDaoSubscriptions', JSON.stringify(allSubscriptions));
     }
   }, [allSubscriptions]);
-  
+
   // Update subscriptions when address changes
   useEffect(() => {
     // This is just to ensure the UI updates when account changes
@@ -66,22 +66,19 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
   // Add a new subscription for the current account
   const addSubscription = (dao: DaoConfigItem) => {
     if (!address) return; // Don't save if no address is connected
-    
+
     setAllSubscriptions(prev => {
       const userSubscriptions = prev[address] || [];
-      
+
       // Check if already subscribed
       if (userSubscriptions.some(sub => sub.dao?.identifier === dao.identifier)) {
         return prev;
       }
-      
+
       // Add new subscription
       return {
         ...prev,
-        [address]: [
-          ...userSubscriptions,
-          { dao }
-        ]
+        [address]: [...userSubscriptions, { dao }],
       };
     });
   };
@@ -89,13 +86,13 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
   // Remove a subscription for the current account
   const removeSubscription = (dao: DaoConfigItem) => {
     if (!address) return;
-    
+
     setAllSubscriptions(prev => {
       const userSubscriptions = prev[address] || [];
-      
+
       return {
         ...prev,
-        [address]: userSubscriptions.filter(sub => sub.dao?.identifier !== dao.identifier)
+        [address]: userSubscriptions.filter(sub => sub.dao?.identifier !== dao.identifier),
       };
     });
   };
@@ -103,7 +100,7 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
   // Check if the current account is subscribed
   const isSubscribed = (dao: DaoConfigItem) => {
     if (!address) return false;
-    
+
     const userSubscriptions = allSubscriptions[address] || [];
     return userSubscriptions.some(sub => sub.dao?.identifier === dao.identifier);
   };
@@ -113,12 +110,10 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
     subscriptions: currentSubscriptions,
     addSubscription,
     removeSubscription,
-    isSubscribed
+    isSubscribed,
   };
 
   return (
-    <SubscriptionsContext.Provider value={contextValue}>
-      {children}
-    </SubscriptionsContext.Provider>
+    <SubscriptionsContext.Provider value={contextValue}>{children}</SubscriptionsContext.Provider>
   );
 }

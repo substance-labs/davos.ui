@@ -1,4 +1,4 @@
-import { sepolia, arbitrum } from 'wagmi/chains'
+import { sepolia, arbitrum } from 'wagmi/chains';
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { http } from 'viem';
 import { RPC_URL } from './lib/constants';

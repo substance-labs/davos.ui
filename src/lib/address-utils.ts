@@ -1,10 +1,4 @@
-import { 
-  uniqueNamesGenerator, 
-  Config, 
-  adjectives, 
-  colors, 
-  animals 
-} from 'unique-names-generator';
+import { uniqueNamesGenerator, Config, adjectives, colors, animals } from 'unique-names-generator';
 import { useEnsName } from 'wagmi';
 
 // Configure the name generator
@@ -12,7 +6,7 @@ const nameConfig: Config = {
   dictionaries: [adjectives, colors, animals],
   separator: ' ',
   length: 2,
-  style: 'capital'
+  style: 'capital',
 };
 
 /**
@@ -22,14 +16,14 @@ const nameConfig: Config = {
  */
 export function getAddressName(address: string): string {
   if (!address) return 'Unknown';
-  
+
   // Use the address as a seed for the name generator
   // This ensures the same address always gets the same name
   const customConfig: Config = {
     ...nameConfig,
-    seed: address.toLowerCase()
+    seed: address.toLowerCase(),
   };
-  
+
   return uniqueNamesGenerator(customConfig);
 }
 
@@ -48,18 +42,18 @@ export function shortenAddress(address: string): string {
  * Attempts ENS resolution first, then falls back to a readable generated name
  */
 export function useAddressDisplay(address: string | undefined) {
-  const { data: ensName, isLoading } = useEnsName({ 
-    address: address as `0x${string}`
+  const { data: ensName, isLoading } = useEnsName({
+    address: address as `0x${string}`,
   });
-  
+
   // Generate a consistent name from the address if no ENS is available
   const generatedName = address ? getAddressName(address) : '';
   const shortAddress = address ? shortenAddress(address) : '';
-  
+
   return {
     displayName: ensName || generatedName,
     shortAddress,
     isLoading,
-    isEns: !!ensName
+    isEns: !!ensName,
   };
 }
