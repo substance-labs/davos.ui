@@ -2,22 +2,41 @@
 // IMPORTS
 // ============================================================================
 
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-import { DAVOS_API_ENDPOINT, SNAPSHOT_DELEGATION_REGISTRY, ZERO_ADDRESS } from "./constants";
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+import { DAVOS_API_ENDPOINT, SNAPSHOT_DELEGATION_REGISTRY, ZERO_ADDRESS } from './constants';
 import { HDKey, hdKeyToAccount } from 'viem/accounts';
-import { toHex, hexToBytes, Address, keccak256, stringToBytes } from "viem";
-import { readContract } from "wagmi/actions";
-import { config } from "./wagmi";
-import SnapshotDelegationRegistryABI from "@/artifacts/SnapshotDelegationRegistry.json";
+import {
+  toHex,
+  hexToBytes,
+  Address,
+  keccak256,
+  stringToBytes,
+  WriteContractParameters,
+  Abi,
+} from 'viem';
+import { readContract } from 'wagmi/actions';
+import { config } from './wagmi';
+import SnapshotDelegationRegistryABIRaw from '@/artifacts/SnapshotDelegationRegistry.json';
 import type { PublicClient } from 'viem';
-import { logger } from "./logger";
+import { logger } from './logger';
+
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+const SnapshotDelegationRegistryABI = SnapshotDelegationRegistryABIRaw as Abi;
+
+type WriteContractAsync = <const config extends WriteContractParameters>(
+  variables: config
+) => Promise<`0x${string}`>;
 
 // ============================================================================
 // ENVIRONMENT HELPERS
 // ============================================================================
 
-const isTestMode = () => (import.meta as any).env?.VITE_TEST_ENV === 'true';
+const isTestMode = () =>
+  (import.meta as { env?: { VITE_TEST_ENV?: string } }).env?.VITE_TEST_ENV === 'true';
 
 // ============================================================================
 // UI UTILITIES
@@ -27,7 +46,7 @@ const isTestMode = () => (import.meta as any).env?.VITE_TEST_ENV === 'true';
  * Combines class names with Tailwind merge
  */
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 /**
@@ -53,18 +72,18 @@ export function formatNumber(num: number): string {
  * Generates a random Ethereum address for testing
  */
 function generateMockAddress(): string {
-  return `0x${Array.from({length: 40}, () => 
-    Math.floor(Math.random() * 16).toString(16)
-  ).join('')}`;
+  return `0x${Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(
+    ''
+  )}`;
 }
 
 /**
  * Generates a random transaction hash for testing
  */
 function generateMockTxHash(): string {
-  return `0x${Array.from({length: 64}, () => 
-    Math.floor(Math.random() * 16).toString(16)
-  ).join('')}`;
+  return `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(
+    ''
+  )}`;
 }
 
 // ============================================================================
@@ -75,21 +94,23 @@ function generateMockTxHash(): string {
  * Predicts the agent address for a user and space
  */
 export async function predictAgentAddress(
-  userAddress: Address, 
-  spaceId: string, 
+  userAddress: Address,
+  spaceId: string,
   source: string = 'snapshot'
 ): Promise<string> {
   if (isTestMode()) {
-    logger.testMode(`Mocking agent address prediction for user: ${userAddress}, space: ${spaceId}, source: ${source}`);
+    logger.testMode(
+      `Mocking agent address prediction for user: ${userAddress}, space: ${spaceId}, source: ${source}`
+    );
     return generateMockAddress();
   }
 
   try {
     const response = await fetch(`${DAVOS_API_ENDPOINT}/init-agent`, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({
         userAddress,
@@ -105,12 +126,12 @@ export async function predictAgentAddress(
     const data = await response.json();
 
     if (!data.success) {
-      throw new Error(data.error || "Failed to predict agent address");
+      throw new Error(data.error || 'Failed to predict agent address');
     }
 
-    return data.predictedAgentAddress || "";
+    return data.predictedAgentAddress || '';
   } catch (error) {
-    logger.error("Error predicting agent address:", error);
+    logger.error('Error predicting agent address:', error);
     throw error;
   }
 }
@@ -119,52 +140,52 @@ export async function predictAgentAddress(
  * Deploys the KMS adapter for a specific voter address
  */
 export async function deployKMS(
-  userAddress: Address, 
+  userAddress: Address,
   source: string = 'snapshot'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
-  logger.debug("deployKMS called with test mode:", isTestMode(), "endpoint:", DAVOS_API_ENDPOINT);
-  
+  logger.debug('deployKMS called with test mode:', isTestMode(), 'endpoint:', DAVOS_API_ENDPOINT);
+
   if (isTestMode()) {
     logger.testMode(`Mocking KMS deployment for user: ${userAddress}, source: ${source}`);
     return {
       kmsAddress: generateMockAddress(),
-      success: true
+      success: true,
     };
   }
 
   logger.info(`Making API call to deploy KMS for user: ${userAddress}, source: ${source}`);
-  
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
-  
+
   try {
     const response = await fetch(`${DAVOS_API_ENDPOINT}/get-kms`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userAddress, source }),
-      signal: controller.signal
+      signal: controller.signal,
     });
-    
+
     clearTimeout(timeoutId);
-    logger.debug("KMS API response status:", response.status);
-    
+    logger.debug('KMS API response status:', response.status);
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("KMS API error response:", errorText);
+      console.error('KMS API error response:', errorText);
       throw new Error(`Failed to deploy KMS adapter: ${response.status} - ${errorText}`);
     }
-    
+
     const data = await response.json();
-    console.log("KMS API success response:", data);
     return data;
   } catch (error) {
     clearTimeout(timeoutId);
-    
+
     if (error instanceof Error && error.name === 'AbortError') {
       console.error('KMS deployment timed out after 30 seconds');
       throw new Error('KMS deployment timed out - please check if the API server is running');
     }
-    
+
     console.error('Error deploying KMS adapter:', error);
     throw error;
   }
@@ -174,17 +195,20 @@ export async function deployKMS(
  * Enable a new agent for a specific voter address
  */
 export async function createAgent(
-  userAddress: Address, 
-  spaceId: string, 
-  kmsAddress: Address, 
+  userAddress: Address,
+  spaceId: string,
+  kmsAddress: Address,
   source: string = 'snapshot'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   if (isTestMode()) {
-    console.log(`[TEST MODE] Mocking agent creation for user: ${userAddress}, space: ${spaceId}, source: ${source}`);
+    console.info(
+      `[TEST MODE] Mocking agent creation for user: ${userAddress}, space: ${spaceId}, source: ${source}`
+    );
     return {
       id: `test-agent-${Date.now()}`,
       existingAgent: false,
-      success: true
+      success: true,
     };
   }
 
@@ -193,11 +217,11 @@ export async function createAgent(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userAddress, spaceId, kmsAddress, source }),
   });
-  
+
   if (!response.ok) {
     throw new Error(`Failed to enable Agent: ${response.status}`);
   }
-  
+
   return await response.json();
 }
 
@@ -205,19 +229,20 @@ export async function createAgent(
  * Enable an agent on a specific Snapshot space
  */
 export async function enableAgent(
-  spaceId: string, 
-  agentId: string, 
+  spaceId: string,
+  agentId: string,
   existing: boolean
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   if (isTestMode()) {
-    console.log(`[TEST MODE] Mocking agent enable for space: ${spaceId}, agent: ${agentId}`);
+    console.info(`[TEST MODE] Mocking agent enable for space: ${spaceId}, agent: ${agentId}`);
     return {
       id: `test-agent-${Date.now()}`,
       spaceId,
       agentId,
       status: 'active',
       createdAt: new Date().toISOString(),
-      existingAgent: existing
+      existingAgent: existing,
     };
   }
 
@@ -226,9 +251,9 @@ export async function enableAgent(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true'
+        'ngrok-skip-browser-warning': 'true',
       },
-      body: JSON.stringify({ agentId })
+      body: JSON.stringify({ agentId }),
     });
 
     if (!response.ok) {
@@ -246,12 +271,15 @@ export async function enableAgent(
  * Removes an agent from a specific Snapshot space
  */
 export async function stopAgent(
-  spaceId: string, 
-  userAddress: Address, 
+  spaceId: string,
+  userAddress: Address,
   source: string = 'snapshot'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   if (isTestMode()) {
-    console.log(`[TEST MODE] Mocking agent stop for space: ${spaceId}, user: ${userAddress}, source: ${source}`);
+    console.info(
+      `[TEST MODE] Mocking agent stop for space: ${spaceId}, user: ${userAddress}, source: ${source}`
+    );
     return { success: true, message: 'Agent stopped successfully' };
   }
 
@@ -260,9 +288,9 @@ export async function stopAgent(
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true'
+        'ngrok-skip-browser-warning': 'true',
       },
-      body: JSON.stringify({ source })
+      body: JSON.stringify({ source }),
     });
 
     if (!response.ok) {
@@ -287,13 +315,13 @@ export async function stopAgent(
 export const getHDAccountByAddress = (address: string) => {
   const masterSeed = toHex(new TextEncoder().encode(`master-seed-${address}`));
   const hdKey = HDKey.fromMasterSeed(hexToBytes(masterSeed));
-  
+
   const index = Number(BigInt(address).toString(10).slice(0, 10));
   const account = hdKeyToAccount(hdKey, {
     accountIndex: 1,
-    addressIndex: index
+    addressIndex: index,
   });
-  
+
   return account;
 };
 
@@ -359,10 +387,11 @@ export async function getDelegationStatusLegacy(
   spaceId: string
 ): Promise<{ exists: boolean; target: `0x${string}` | null }> {
   // Use test mode adapter if VITE_TEST_ENV is true
-  const isTestMode = (import.meta as any).env?.VITE_TEST_ENV === 'true';
+  const isTestMode =
+    (import.meta as { env?: { VITE_TEST_ENV?: string } }).env?.VITE_TEST_ENV === 'true';
   if (isTestMode) {
     // Mock response for test environment - simulate no delegation
-    console.log(`[TEST MODE] Mocking delegation status check for user: ${user}, space: ${spaceId}`);
+    console.info(`[TEST MODE] Mocking delegation status check for user: ${user}, space: ${spaceId}`);
     return { exists: false, target: null };
   }
 
@@ -370,7 +399,7 @@ export async function getDelegationStatusLegacy(
   const delegatee = (await readContract(config, {
     address: SNAPSHOT_DELEGATION_REGISTRY,
     abi: SnapshotDelegationRegistryABI,
-    functionName: "delegation",
+    functionName: 'delegation',
     args: [user, id],
   })) as `0x${string}`;
   const exists = delegatee.toLowerCase() !== ZERO_ADDRESS;
@@ -386,10 +415,13 @@ export const verifyBlockchainDelegation = async (
   expected: `0x${string}` | null
 ): Promise<boolean> => {
   // Use test mode adapter if VITE_TEST_ENV is true
-  const isTestMode = (import.meta as any).env?.VITE_TEST_ENV === 'true';
+  const isTestMode =
+    (import.meta as { env?: { VITE_TEST_ENV?: string } }).env?.VITE_TEST_ENV === 'true';
   if (isTestMode) {
     // Mock response for test environment - simulate successful verification
-    console.log(`[TEST MODE] Mocking blockchain delegation verification for delegator: ${delegator}, space: ${spaceId}`);
+    console.info(
+      `[TEST MODE] Mocking blockchain delegation verification for delegator: ${delegator}, space: ${spaceId}`
+    );
     return true;
   }
 
@@ -397,7 +429,7 @@ export const verifyBlockchainDelegation = async (
   const actual = (await readContract(config, {
     address: SNAPSHOT_DELEGATION_REGISTRY,
     abi: SnapshotDelegationRegistryABI,
-    functionName: "delegation",
+    functionName: 'delegation',
     args: [delegator, id],
   })) as `0x${string}`;
   const want = expected?.toLowerCase() ?? ZERO_ADDRESS;
@@ -412,12 +444,15 @@ export async function delegateOnChainLegacy(
   spaceId: string,
   delegator: `0x${string}`,
   delegatee: `0x${string}`,
-  writeContractAsync: any // Pass the writeContractAsync function
+  writeContractAsync: WriteContractAsync
 ) {
   // Use test mode adapter if VITE_TEST_ENV is true
-  const isTestMode = (import.meta as any).env?.VITE_TEST_ENV === 'true';
+  const isTestMode =
+    (import.meta as { env?: { VITE_TEST_ENV?: string } }).env?.VITE_TEST_ENV === 'true';
   if (isTestMode) {
-    console.log(`[TEST MODE] Mocking on-chain delegation for space: ${spaceId}, delegator: ${delegator}, delegatee: ${delegatee}`);
+    console.info(
+      `[TEST MODE] Mocking on-chain delegation for space: ${spaceId}, delegator: ${delegator}, delegatee: ${delegatee}`
+    );
     return { hash: generateMockTxHash() };
   }
 
@@ -427,7 +462,7 @@ export async function delegateOnChainLegacy(
     const currentDelegate = (await client.readContract({
       address: SNAPSHOT_DELEGATION_REGISTRY,
       abi: SnapshotDelegationRegistryABI,
-      functionName: "delegation",
+      functionName: 'delegation',
       args: [delegator, id],
     })) as `0x${string}`;
 
@@ -447,7 +482,7 @@ export async function delegateOnChainLegacy(
       account: delegator,
       address: SNAPSHOT_DELEGATION_REGISTRY,
       abi: SnapshotDelegationRegistryABI,
-      functionName: "setDelegate",
+      functionName: 'setDelegate',
       args: [id, delegatee],
     });
   } catch (gasError) {
@@ -465,13 +500,13 @@ export async function delegateOnChainLegacy(
   const txHash = await writeContractAsync({
     address: SNAPSHOT_DELEGATION_REGISTRY,
     abi: SnapshotDelegationRegistryABI,
-    functionName: "setDelegate",
+    functionName: 'setDelegate',
     args: [id, delegatee],
     account: delegator,
+    chain: client.chain,
     gas: gas ? (gas * 120n) / 100n : undefined,
     maxFeePerGas,
     maxPriorityFeePerGas,
-    chainId: client.chain?.id,
   });
 
   try {
@@ -496,10 +531,13 @@ export async function getTallyDelegation(
   chainId?: number
 ): Promise<{ exists: boolean; target: `0x${string}` | null }> {
   // Use test mode adapter if VITE_TEST_ENV is true
-  const isTestMode = (import.meta as any).env?.VITE_TEST_ENV === 'true';
+  const isTestMode =
+    (import.meta as { env?: { VITE_TEST_ENV?: string } }).env?.VITE_TEST_ENV === 'true';
   if (isTestMode) {
     // Mock response for test environment - simulate no delegation
-    console.log(`[TEST MODE] Mocking Tally delegation status check for user: ${user}, governor: ${governorAddress}`);
+    console.info(
+      `[TEST MODE] Mocking Tally delegation status check for user: ${user}, governor: ${governorAddress}`
+    );
     return { exists: false, target: null };
   }
 
@@ -507,19 +545,17 @@ export async function getTallyDelegation(
     // For Tally governors, check token delegation if token address is provided
     const addressToCheck = tokenAddress || governorAddress;
     const abi = tokenAddress ? ERC20VOTES_ABI : TALLY_GOVERNOR_ABI;
-    
-    console.log(`[Delegation] Checking Tally delegation on ${tokenAddress ? 'token' : 'governor'}: ${addressToCheck}`);
-    
+
     const delegatee = (await readContract(config, {
       address: addressToCheck,
       abi: abi,
       functionName: 'delegates',
       args: [user],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       chainId: chainId as any,
     })) as `0x${string}`;
 
     const exists = delegatee.toLowerCase() !== ZERO_ADDRESS;
-    console.log(`[Delegation] Current delegatee: ${delegatee}, exists: ${exists}`);
     return { exists, target: exists ? delegatee : null };
   } catch (error) {
     console.error('Error fetching Tally delegation:', error);
@@ -535,7 +571,9 @@ export async function getSnapshotDelegation(
   spaceId: string
 ): Promise<{ exists: boolean; target: `0x${string}` | null }> {
   if (isTestMode()) {
-    console.log(`[TEST MODE] Mocking Snapshot delegation status check for user: ${user}, space: ${spaceId}`);
+    console.info(
+      `[TEST MODE] Mocking Snapshot delegation status check for user: ${user}, space: ${spaceId}`
+    );
     return { exists: false, target: null };
   }
 
@@ -544,7 +582,7 @@ export async function getSnapshotDelegation(
     const delegatee = (await readContract(config, {
       address: SNAPSHOT_DELEGATION_REGISTRY,
       abi: SnapshotDelegationRegistryABI,
-      functionName: "delegation",
+      functionName: 'delegation',
       args: [user, id],
     })) as `0x${string}`;
 
@@ -575,9 +613,7 @@ export async function getDelegationStatus(
     return getSnapshotDelegation(user, identifier);
   } else if (source === 'tally') {
     // Extract the contract address from EIP-155 format (eip155:chainId:address)
-    const tallyAddress = identifier.includes(':') 
-      ? identifier.split(':')[2] 
-      : identifier;
+    const tallyAddress = identifier.includes(':') ? identifier.split(':')[2] : identifier;
     // Extract chainId from identifier if not provided
     let resolvedChainId = chainId;
     if (!resolvedChainId && identifier.includes(':')) {
@@ -596,22 +632,23 @@ export async function delegateTokenVotingPower(
   tokenAddress: `0x${string}`,
   delegator: `0x${string}`,
   delegatee: `0x${string}`,
-  writeContractAsync: any,
-  chainId?: number
+  writeContractAsync: WriteContractAsync,
+  _chainId?: number
 ) {
   // Use test mode adapter if VITE_TEST_ENV is true
-  const isTestMode = (import.meta as any).env?.VITE_TEST_ENV === 'true';
+  const isTestMode =
+    (import.meta as { env?: { VITE_TEST_ENV?: string } }).env?.VITE_TEST_ENV === 'true';
   if (isTestMode) {
     // Mock response for test environment
-    console.log(`[TEST MODE] Mocking token voting power delegation for token: ${tokenAddress}, delegator: ${delegator}, delegatee: ${delegatee}`);
-    return { hash: `0x${Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('')}` };
+    console.info(
+      `[TEST MODE] Mocking token voting power delegation for token: ${tokenAddress}, delegator: ${delegator}, delegatee: ${delegatee}`
+    );
+    return {
+      hash: `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
+    };
   }
 
   try {
-    console.log(`[Delegation] Delegating token voting power on ${tokenAddress} from ${delegator} to ${delegatee}`);
-    console.log(`[Delegation] Using account: ${delegator}`);
-    console.log(`[Delegation] Target chain ID: ${chainId}`);
-    
     // Check if already delegated to target
     try {
       const currentDelegate = (await readContract(config, {
@@ -619,28 +656,27 @@ export async function delegateTokenVotingPower(
         abi: ERC20VOTES_ABI,
         functionName: 'delegates',
         args: [delegator],
-        chainId: chainId as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        chainId: _chainId as any,
       })) as `0x${string}`;
 
       if (currentDelegate?.toLowerCase() === delegatee.toLowerCase()) {
         return { hash: null, alreadyDelegated: true };
       }
-      console.log(`[Delegation] Current delegate: ${currentDelegate}, changing to: ${delegatee}`);
     } catch (readError) {
       console.warn('[Delegation] Unable to check current token delegate:', readError);
     }
-    
+
     const hash = await writeContractAsync({
       address: tokenAddress,
       abi: ERC20VOTES_ABI,
       functionName: 'delegate',
       args: [delegatee],
       account: delegator,
-      chainId: chainId,
+      chain: null, // Will use connected wallet's chain
       // Let wagmi handle gas estimation for token delegation
       // Gas estimation is less critical here as token.delegate() is simpler than registry operations
     });
-    console.log(`[Delegation] Token delegation hash: ${hash}`);
     return { hash };
   } catch (error) {
     console.error(`[Delegation] Error delegating token voting power:`, error);
@@ -657,43 +693,53 @@ export async function delegateTallyOnChain(
   governorAddress: `0x${string}`,
   delegator: `0x${string}`,
   delegatee: `0x${string}`,
-  writeContractAsync: any,
+  writeContractAsync: WriteContractAsync,
   tokenAddress?: `0x${string}`,
   chainId?: number
 ) {
   // Use test mode adapter if VITE_TEST_ENV is true
-  const isTestMode = (import.meta as any).env?.VITE_TEST_ENV === 'true';
+  const isTestMode =
+    (import.meta as { env?: { VITE_TEST_ENV?: string } }).env?.VITE_TEST_ENV === 'true';
   if (isTestMode) {
     // Mock response for test environment
-    console.log(`[TEST MODE] Mocking Tally on-chain delegation for governor: ${governorAddress}, delegator: ${delegator}, delegatee: ${delegatee}`);
-    return { hash: `0x${Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('')}` };
+    console.info(
+      `[TEST MODE] Mocking Tally on-chain delegation for governor: ${governorAddress}, delegator: ${delegator}, delegatee: ${delegatee}`
+    );
+    return {
+      hash: `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
+    };
   }
 
   try {
     // For Tally Governors, voting power comes from the token delegation
     // The Governor reads voting power from the underlying token (e.g., ARB)
     // So we ONLY need to delegate the token voting power, not call delegate on the Governor
-    
+
     if (tokenAddress) {
-      console.log(`[Delegation] Delegating voting power on token ${tokenAddress} (Governor uses token voting power)`);
-      const tokenTx = await delegateTokenVotingPower(tokenAddress, delegator, delegatee, writeContractAsync, chainId);
-      console.log(`[Delegation] Token delegation submitted with hash: ${tokenTx.hash}`);
-      console.log(`[Delegation] Waiting for token delegation to be confirmed...`);
-      
+      const tokenTx = await delegateTokenVotingPower(
+        tokenAddress,
+        delegator,
+        delegatee,
+        writeContractAsync,
+        chainId
+      );
+
       if (tokenTx.hash) {
         try {
-          const receipt = await client.waitForTransactionReceipt({ 
+          await client.waitForTransactionReceipt({
             hash: tokenTx.hash as `0x${string}`,
           });
-          console.log(`[Delegation] Token delegation confirmed! Receipt:`, receipt);
         } catch (waitError) {
-          console.warn(`[Delegation] Could not wait for token delegation confirmation, proceeding anyway:`, waitError);
+          console.warn(
+            `[Delegation] Could not wait for token delegation confirmation, proceeding anyway:`,
+            waitError
+          );
         }
       }
       return tokenTx;
     }
-    
-    throw new Error("Token address is required for Tally Governor delegation");
+
+    throw new Error('Token address is required for Tally Governor delegation');
   } catch (error) {
     console.error(`[Delegation] Error delegating on Tally Governor:`, error);
     throw error;
@@ -708,15 +754,21 @@ export async function delegateSnapshotOnChain(
   spaceId: string,
   delegator: `0x${string}`,
   delegatee: `0x${string}`,
-  writeContractAsync: any,
-  chainId?: number
+  writeContractAsync: WriteContractAsync,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _chainId?: number
 ) {
   // Use test mode adapter if VITE_TEST_ENV is true
-  const isTestMode = (import.meta as any).env?.VITE_TEST_ENV === 'true';
+  const isTestMode =
+    (import.meta as { env?: { VITE_TEST_ENV?: string } }).env?.VITE_TEST_ENV === 'true';
   if (isTestMode) {
     // Mock response for test environment
-    console.log(`[TEST MODE] Mocking Snapshot on-chain delegation for space: ${spaceId}, delegator: ${delegator}, delegatee: ${delegatee}`);
-    return { hash: `0x${Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('')}` };
+    console.info(
+      `[TEST MODE] Mocking Snapshot on-chain delegation for space: ${spaceId}, delegator: ${delegator}, delegatee: ${delegatee}`
+    );
+    return {
+      hash: `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
+    };
   }
 
   const id = keccak256(stringToBytes(spaceId));
@@ -725,7 +777,7 @@ export async function delegateSnapshotOnChain(
     const currentDelegate = (await client.readContract({
       address: SNAPSHOT_DELEGATION_REGISTRY,
       abi: SnapshotDelegationRegistryABI,
-      functionName: "delegation",
+      functionName: 'delegation',
       args: [delegator, id],
     })) as `0x${string}`;
 
@@ -745,7 +797,7 @@ export async function delegateSnapshotOnChain(
       account: delegator,
       address: SNAPSHOT_DELEGATION_REGISTRY,
       abi: SnapshotDelegationRegistryABI,
-      functionName: "setDelegate",
+      functionName: 'setDelegate',
       args: [id, delegatee],
     });
   } catch (gasError) {
@@ -763,13 +815,13 @@ export async function delegateSnapshotOnChain(
   const txHash = await writeContractAsync({
     address: SNAPSHOT_DELEGATION_REGISTRY,
     abi: SnapshotDelegationRegistryABI,
-    functionName: "setDelegate",
+    functionName: 'setDelegate',
     args: [id, delegatee],
     account: delegator,
+    chain: client.chain,
     gas: gas ? (gas * 120n) / 100n : undefined,
     maxFeePerGas,
     maxPriorityFeePerGas,
-    chainId: chainId ?? client.chain?.id,
   });
 
   try {
@@ -790,24 +842,37 @@ export async function delegateOnChainWithSource(
   identifier: string,
   delegator: `0x${string}`,
   delegatee: `0x${string}`,
-  writeContractAsync: any,
+  writeContractAsync: WriteContractAsync,
   tokenAddress?: `0x${string}`,
   chainId?: number
 ) {
   if (source === 'snapshot') {
-  return delegateSnapshotOnChain(client, identifier, delegator, delegatee, writeContractAsync, chainId);
+    return delegateSnapshotOnChain(
+      client,
+      identifier,
+      delegator,
+      delegatee,
+      writeContractAsync,
+      chainId
+    );
   } else if (source === 'tally') {
     // Extract the contract address from EIP-155 format (eip155:chainId:address)
-    const tallyAddress = identifier.includes(':') 
-      ? identifier.split(':')[2] 
-      : identifier;
+    const tallyAddress = identifier.includes(':') ? identifier.split(':')[2] : identifier;
     // Extract chainId from identifier if not provided
     let resolvedChainId = chainId;
     if (!resolvedChainId && identifier.includes(':')) {
       const parts = identifier.split(':');
       resolvedChainId = parseInt(parts[1], 10);
     }
-    return delegateTallyOnChain(client, tallyAddress as `0x${string}`, delegator, delegatee, writeContractAsync, tokenAddress, resolvedChainId);
+    return delegateTallyOnChain(
+      client,
+      tallyAddress as `0x${string}`,
+      delegator,
+      delegatee,
+      writeContractAsync,
+      tokenAddress,
+      resolvedChainId
+    );
   }
   throw new Error(`Unknown source: ${source}`);
 }
@@ -819,14 +884,19 @@ export async function revokeOnChain(
   client: PublicClient,
   spaceId: string,
   delegator: `0x${string}`,
-  writeContractAsync: any // Pass the writeContractAsync function
+  writeContractAsync: WriteContractAsync
 ) {
   // Use test mode adapter if VITE_TEST_ENV is true
-  const isTestMode = (import.meta as any).env?.VITE_TEST_ENV === 'true';
+  const isTestMode =
+    (import.meta as { env?: { VITE_TEST_ENV?: string } }).env?.VITE_TEST_ENV === 'true';
   if (isTestMode) {
     // Mock response for test environment
-    console.log(`[TEST MODE] Mocking on-chain delegation revocation for space: ${spaceId}, delegator: ${delegator}`);
-    return { hash: `0x${Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('')}` };
+    console.info(
+      `[TEST MODE] Mocking on-chain delegation revocation for space: ${spaceId}, delegator: ${delegator}`
+    );
+    return {
+      hash: `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
+    };
   }
 
   const id = keccak256(stringToBytes(spaceId));
@@ -840,7 +910,7 @@ export async function revokeOnChain(
       account: delegator,
       address: SNAPSHOT_DELEGATION_REGISTRY,
       abi: SnapshotDelegationRegistryABI,
-      functionName: "clearDelegate",
+      functionName: 'clearDelegate',
       args: [id],
     });
   } catch (gasError) {
@@ -858,13 +928,13 @@ export async function revokeOnChain(
   const txHash = await writeContractAsync({
     address: SNAPSHOT_DELEGATION_REGISTRY,
     abi: SnapshotDelegationRegistryABI,
-    functionName: "clearDelegate",
+    functionName: 'clearDelegate',
     args: [id],
     account: delegator,
+    chain: client.chain,
     gas: gas ? (gas * 120n) / 100n : undefined,
     maxFeePerGas,
     maxPriorityFeePerGas,
-    chainId: client.chain?.id,
   });
 
   try {
@@ -883,39 +953,50 @@ export async function revokeTallyOnChain(
   client: PublicClient,
   governorAddress: `0x${string}`,
   delegator: `0x${string}`,
-  writeContractAsync: any,
+  writeContractAsync: WriteContractAsync,
   tokenAddress?: `0x${string}`,
   chainId?: number
 ) {
   // Use test mode adapter if VITE_TEST_ENV is true
-  const isTestMode = (import.meta as any).env?.VITE_TEST_ENV === 'true';
+  const isTestMode =
+    (import.meta as { env?: { VITE_TEST_ENV?: string } }).env?.VITE_TEST_ENV === 'true';
   if (isTestMode) {
     // Mock response for test environment
-    console.log(`[TEST MODE] Mocking Tally on-chain delegation revocation for governor: ${governorAddress}, delegator: ${delegator}`);
-    return { hash: `0x${Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('')}` };
+    console.info(
+      `[TEST MODE] Mocking Tally on-chain delegation revocation for governor: ${governorAddress}, delegator: ${delegator}`
+    );
+    return {
+      hash: `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
+    };
   }
 
   try {
     // For Tally, revoke token delegation by delegating to self
     if (tokenAddress) {
-      console.log(`[Revocation] Revoking voting power on token ${tokenAddress} (delegate to self)`);
-      const tokenTx = await delegateTokenVotingPower(tokenAddress, delegator, delegator, writeContractAsync, chainId);
-      console.log(`[Revocation] Token delegation revoked with hash: ${tokenTx.hash}`);
-      
+      const tokenTx = await delegateTokenVotingPower(
+        tokenAddress,
+        delegator,
+        delegator,
+        writeContractAsync,
+        chainId
+      );
+
       if (tokenTx.hash) {
         try {
-          const receipt = await client.waitForTransactionReceipt({ 
+          await client.waitForTransactionReceipt({
             hash: tokenTx.hash as `0x${string}`,
           });
-          console.log(`[Revocation] Token revocation confirmed! Receipt:`, receipt);
         } catch (waitError) {
-          console.warn(`[Revocation] Could not wait for token revocation confirmation, proceeding anyway:`, waitError);
+          console.warn(
+            `[Revocation] Could not wait for token revocation confirmation, proceeding anyway:`,
+            waitError
+          );
         }
       }
       return tokenTx;
     }
-    
-    throw new Error("Token address is required for Tally Governor revocation");
+
+    throw new Error('Token address is required for Tally Governor revocation');
   } catch (error) {
     console.error(`[Revocation] Error revoking Tally Governor delegation:`, error);
     throw error;
@@ -930,7 +1011,7 @@ export async function revokeOnChainWithSource(
   source: string,
   identifier: string,
   delegator: `0x${string}`,
-  writeContractAsync: any,
+  writeContractAsync: WriteContractAsync,
   tokenAddress?: `0x${string}`,
   chainId?: number
 ) {
@@ -938,16 +1019,21 @@ export async function revokeOnChainWithSource(
     return revokeOnChain(client, identifier, delegator, writeContractAsync);
   } else if (source === 'tally') {
     // Extract the contract address from EIP-155 format (eip155:chainId:address)
-    const tallyAddress = identifier.includes(':') 
-      ? identifier.split(':')[2] 
-      : identifier;
+    const tallyAddress = identifier.includes(':') ? identifier.split(':')[2] : identifier;
     // Extract chainId from identifier if not provided
     let resolvedChainId = chainId;
     if (!resolvedChainId && identifier.includes(':')) {
       const parts = identifier.split(':');
       resolvedChainId = parseInt(parts[1], 10);
     }
-    return revokeTallyOnChain(client, tallyAddress as `0x${string}`, delegator, writeContractAsync, tokenAddress, resolvedChainId);
+    return revokeTallyOnChain(
+      client,
+      tallyAddress as `0x${string}`,
+      delegator,
+      writeContractAsync,
+      tokenAddress,
+      resolvedChainId
+    );
   }
   throw new Error(`Unknown source: ${source}`);
 }

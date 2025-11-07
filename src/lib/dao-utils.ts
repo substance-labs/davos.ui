@@ -1,40 +1,61 @@
-import { useQuery } from '@tanstack/react-query'
-import { fetchTallyGovernor, fetchAllTallyProposals } from './tally-utils'
-import { fetchSpace, fetchAllProposals } from './snapshot-utils'
-import { normalizeTallyDAO, normalizeSnapshotDAO, normalizeTallyProposal, normalizeSnapshotProposal } from './data-normalizer'
+import { useQuery } from '@tanstack/react-query';
+import { fetchTallyGovernor, fetchAllTallyProposals } from './tally-utils';
+import { fetchSpace, fetchAllProposals } from './snapshot-utils';
+import {
+  normalizeTallyDAO,
+  normalizeSnapshotDAO,
+  normalizeTallyProposal,
+  normalizeSnapshotProposal,
+} from './data-normalizer';
 
-const getTimestampFromBlockLike = (value: any): number | undefined => {
+// Type definitions
+interface BlockLike {
+  timestamp?: number | string;
+  ts?: number | string;
+}
+
+export interface Proposal {
+  title: string;
+  body: string;
+  created?: number;
+  start?: number;
+  end?: number;
+  [key: string]: unknown;
+}
+
+const getTimestampFromBlockLike = (value: unknown): number | undefined => {
   if (value === undefined || value === null) {
-    return undefined
+    return undefined;
   }
 
   if (typeof value === 'string') {
-    const parsed = Date.parse(value)
+    const parsed = Date.parse(value);
     if (!Number.isNaN(parsed)) {
-      return Math.floor(parsed / 1000)
+      return Math.floor(parsed / 1000);
     }
-    const numeric = Number(value)
+    const numeric = Number(value);
     if (!Number.isNaN(numeric) && Number.isFinite(numeric)) {
-      return Math.floor(numeric)
+      return Math.floor(numeric);
     }
-    return undefined
+    return undefined;
   }
 
   if (typeof value === 'number' && Number.isFinite(value)) {
-    return value > 1_000_000_000_000 ? Math.floor(value / 1000) : Math.floor(value)
+    return value > 1_000_000_000_000 ? Math.floor(value / 1000) : Math.floor(value);
   }
 
-  if (typeof value === 'object') {
-    if ('timestamp' in value) {
-      return getTimestampFromBlockLike((value as any).timestamp)
+  if (typeof value === 'object' && value !== null) {
+    const obj = value as BlockLike;
+    if ('timestamp' in obj) {
+      return getTimestampFromBlockLike(obj.timestamp);
     }
-    if ('ts' in value) {
-      return getTimestampFromBlockLike((value as any).ts)
+    if ('ts' in obj) {
+      return getTimestampFromBlockLike(obj.ts);
     }
   }
 
-  return undefined
-}
+  return undefined;
+};
 
 /**
  * Enhanced fetchDaoInfo with source routing
@@ -42,7 +63,7 @@ const getTimestampFromBlockLike = (value: any): number | undefined => {
 export async function fetchDaoInfo(
   source: string = 'snapshot',
   identifier: string = 'aave.eth'
-): Promise<any> {
+): Promise<unknown> {
   if (source === 'snapshot') {
     return fetchSnapshotDaoInfo(identifier);
   } else if (source === 'tally') {
@@ -54,6 +75,7 @@ export async function fetchDaoInfo(
 /**
  * Fetch Snapshot DAO info
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function fetchSnapshotDaoInfo(space: string): Promise<any> {
   try {
     const spaceData = await fetchSpace(space);
@@ -67,6 +89,7 @@ async function fetchSnapshotDaoInfo(space: string): Promise<any> {
 /**
  * Fetch Tally DAO info
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function fetchTallyDaoInfo(governorId: string): Promise<any> {
   try {
     // Use the full EIP-155 identifier for Tally API
@@ -86,6 +109,7 @@ export async function fetchProposals(
   identifier: string,
   limit: number = 300,
   subDaos?: Array<{ name: string; identifier: string; source: string }>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   if (source === 'snapshot') {
     return fetchSnapshotProposalsData(identifier, limit);
@@ -102,14 +126,16 @@ export async function fetchProposals(
 /**
  * Fetch Snapshot proposals
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function fetchSnapshotProposalsData(space: string, limit: number = 300): Promise<any> {
   try {
     const result = await fetchAllProposals(space, limit);
     // Normalize the proposals and add source/space information
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const normalizedProposals = result.proposals.map((proposal: any) => ({
       ...normalizeSnapshotProposal(proposal),
       source: 'snapshot',
-      space: proposal.space || { id: space }
+      space: proposal.space || { id: space },
     }));
     return { proposals: normalizedProposals };
   } catch (error) {
@@ -124,8 +150,10 @@ async function fetchSnapshotProposalsData(space: string, limit: number = 300): P
 async function fetchTallyProposalsDataMultiple(
   subDaos: Array<{ name: string; identifier: string; source: string }>,
   limit: number = 300
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allProposals: any[] = [];
     const limitPerDao = Math.floor(limit / Math.max(1, subDaos.length));
 
@@ -134,7 +162,7 @@ async function fetchTallyProposalsDataMultiple(
       try {
         const result = await fetchTallyProposalsData(subDao.identifier, limitPerDao);
         allProposals.push(...(result.proposals || []));
-      } catch (error) {
+      } catch {
         // Continue with other sub-DAOs even if one fails
       }
     }
@@ -156,14 +184,18 @@ async function fetchTallyProposalsDataMultiple(
 async function fetchTallyProposalsData(
   governorId: string,
   limit: number = 300
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   try {
     // First fetch the governor to get the organization ID
     const governor = await fetchTallyGovernor(governorId);
     const result = await fetchAllTallyProposals(governor.id ?? governorId, limit);
-    
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const normalizedProposals = (result.proposals || []).map((proposal: any) => {
-      const startTimestamp = getTimestampFromBlockLike(proposal.start) ?? getTimestampFromBlockLike(proposal.block?.timestamp);
+      const startTimestamp =
+        getTimestampFromBlockLike(proposal.start) ??
+        getTimestampFromBlockLike(proposal.block?.timestamp);
       const endTimestamp = getTimestampFromBlockLike(proposal.end);
 
       return normalizeTallyProposal(proposal, {
@@ -171,7 +203,7 @@ async function fetchTallyProposalsData(
         endTimestamp,
       });
     });
-    
+
     return { proposals: normalizedProposals };
   } catch (error) {
     console.error('Error fetching Tally proposals:', error);
@@ -182,7 +214,11 @@ async function fetchTallyProposalsData(
 /**
  * Base function to fetch DAO info - Non-hook version (legacy)
  */
-export async function fetchDaoInfoLegacy(source: string = 'snapshot', identifier: string = 'aave.eth'): Promise<any> {
+export async function fetchDaoInfoLegacy(
+  source: string = 'snapshot',
+  identifier: string = 'aave.eth'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
   try {
     return await fetchProposals(source, identifier);
   } catch (error) {
@@ -194,12 +230,12 @@ export async function fetchDaoInfoLegacy(source: string = 'snapshot', identifier
 /**
  * Filter proposals by age (in days)
  */
-export const filterProposalsByAge = (proposals: any[], maxAgeDays: number) => {
+export const filterProposalsByAge = (proposals: Proposal[], maxAgeDays: number) => {
   if (!proposals || proposals.length === 0) return [];
-  
+
   const now = Math.floor(Date.now() / 1000); // Current time in seconds
-  return proposals.filter((proposal: any) => {
-    const proposalAge = now - proposal.start;
+  return proposals.filter(proposal => {
+    const proposalAge = now - (proposal.start || 0);
     const maxAgeSeconds = maxAgeDays * 24 * 60 * 60; // Convert days to seconds
     return proposalAge <= maxAgeSeconds;
   });
@@ -214,21 +250,19 @@ export const filterProposalsByAge = (proposals: any[], maxAgeDays: number) => {
  * @returns Object containing latest proposals and the generated prompt
  */
 export function processProposalsForDigest(
-  proposals: any[],
+  proposals: Proposal[],
   isLoading: boolean,
-  error: any,
+  error: Error | null,
   maxProposals: number = 20
 ) {
-  const latestProposals = 
-    !isLoading && !error && proposals.length > 0
-      ? proposals.slice(-maxProposals)
-      : [];
+  const latestProposals =
+    !isLoading && !error && proposals.length > 0 ? proposals.slice(-maxProposals) : [];
 
-  const prompt = 
+  const prompt =
     proposals.length === 0 || isLoading
       ? ''
       : `Recent proposals: ${latestProposals
-          .map((p: any) => `BEGIN "${p.title}" - ${p.body} END`)
+          .map(p => `BEGIN "${p.title}" - ${p.body} END`)
           .join('\n')}`;
 
   return { latestProposals, prompt };
@@ -260,10 +294,7 @@ export const formatMinutesToTime = (minutes: number): string => {
 /**
  * React Query hook for Tally DAO info
  */
-export function useTallyDaoInfo(
-  governorId: string,
-  options = {}
-) {
+export function useTallyDaoInfo(governorId: string, options = {}) {
   return useQuery({
     queryKey: ['tallyDaoInfo', governorId],
     queryFn: () => fetchTallyDaoInfo(governorId),
@@ -276,11 +307,7 @@ export function useTallyDaoInfo(
 /**
  * React Query hook for Tally proposals
  */
-export function useTallyProposals(
-  governorId: string,
-  limit: number = 300,
-  options = {}
-) {
+export function useTallyProposals(governorId: string, limit: number = 300, options = {}) {
   return useQuery({
     queryKey: ['tallyProposals', governorId, limit],
     queryFn: () => fetchTallyProposalsData(governorId, limit),

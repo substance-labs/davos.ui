@@ -3,16 +3,16 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { useAccount, useReadContract } from 'wagmi';
 import DeleGateABI from '@/artifacts/DeleGate.json';
 
-type UserAgentData = Array<{space: string, module: string}>;
+type UserAgentData = Array<{ space: string; module: string }>;
 
 // Define the structure of a Agent
 export interface Agent {
-  dao: DaoConfigItem
+  dao: DaoConfigItem;
 }
 
 // Interface for Agents storage by account
 interface AccountAgents {
-  [address: string]: Agent[]
+  [address: string]: Agent[];
 }
 
 // Define the context shape
@@ -38,8 +38,12 @@ export const useAgents = () => useContext(AgentsContext);
 
 // Provider component
 export function AgentsProvider({ children }: { children: ReactNode }) {
-  const { address, isConnected: _isConnected } = useAccount();  
-  const { data: userAgentsData, isLoading, refetch: _refetch } = useReadContract({
+  const { address, isConnected: _isConnected } = useAccount(); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const {
+    data: userAgentsData,
+    isLoading,
+    refetch: _refetch, // eslint-disable-line @typescript-eslint/no-unused-vars
+  } = useReadContract({
     address: DELEGATE_CONTRACT_ADDRESS,
     abi: DeleGateABI.abi,
     functionName: 'getUserSubscriptions',
@@ -47,31 +51,31 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
     query: {
       enabled: !!address, // Only fetch when address is available
     },
-  }) as { data: UserAgentData | undefined, isLoading: boolean, refetch: () => void };
-  
+  }) as { data: UserAgentData | undefined; isLoading: boolean; refetch: () => void };
+
   const [allAgents, setAllAgents] = useState<AccountAgents>(() => {
     if (typeof window === 'undefined') return {};
-    
+
     // Load all Agent data
     try {
       const saved = localStorage.getItem('allDaoAgents');
       return saved ? JSON.parse(saved) : {};
     } catch (error) {
-      console.error("Failed to parse Agents from localStorage:", error);
+      console.error('Failed to parse Agents from localStorage:', error);
       return {};
     }
   });
-  
+
   // Get current user's Agents
-  const currentAgents = address ? (allAgents[address] || []) : [];
-  
+  const currentAgents = address ? allAgents[address] || [] : [];
+
   // Save to localStorage whenever Agents change
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('allDaoAgents', JSON.stringify(allAgents));
     }
   }, [allAgents]);
-  
+
   // Update agents based on contract data when address changes or data is loaded
   useEffect(() => {
     if (address && userAgentsData && Array.isArray(userAgentsData)) {
@@ -79,21 +83,21 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
       const contractAgents: Agent[] = userAgentsData
         .map(item => {
           // Find the corresponding DAO config by space
-          const daoEntry = Object.entries(daoConfig).find(([_, config]) => 
-            config.identifier === item.space
+          const daoEntry = Object.entries(daoConfig).find(
+            ([_, config]) => config.identifier === item.space // eslint-disable-line @typescript-eslint/no-unused-vars
           );
-          
+
           if (daoEntry) {
             return { dao: daoEntry[1] };
           }
           return null;
         })
         .filter(Boolean) as Agent[];
-      
+
       // Replace the agents for this address with contract data
       setAllAgents(prev => ({
         ...prev,
-        [address]: contractAgents
+        [address]: contractAgents,
       }));
     }
   }, [address, userAgentsData]);
@@ -101,22 +105,19 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
   // Add a new Agent for the current account
   const addAgent = (dao: DaoConfigItem) => {
     if (!address) return; // Don't save if no address is connected
-    
+
     setAllAgents(prev => {
       const userAgents = prev[address] || [];
-      
+
       // Check if already subscribed
       if (userAgents.some(sub => sub.dao?.identifier === dao.identifier)) {
         return prev;
       }
-      
+
       // Add new Agent
       return {
         ...prev,
-        [address]: [
-          ...userAgents,
-          { dao }
-        ]
+        [address]: [...userAgents, { dao }],
       };
     });
   };
@@ -124,13 +125,13 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
   // Remove a Agent for the current account
   const removeAgent = (dao: DaoConfigItem) => {
     if (!address) return;
-    
+
     setAllAgents(prev => {
       const userAgents = prev[address] || [];
-      
+
       return {
         ...prev,
-        [address]: userAgents.filter(sub => sub.dao?.identifier !== dao.identifier)
+        [address]: userAgents.filter(sub => sub.dao?.identifier !== dao.identifier),
       };
     });
   };
@@ -138,7 +139,7 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
   // Check if the current account is subscribed
   const hasAgent = (dao: DaoConfigItem) => {
     if (!address) return false;
-    
+
     const userAgents = allAgents[address] || [];
     return userAgents.some(sub => sub.dao?.identifier === dao.identifier);
   };
@@ -149,12 +150,8 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
     addAgent,
     removeAgent,
     hasAgent,
-    isLoading
+    isLoading,
   };
 
-  return (
-    <AgentsContext.Provider value={contextValue}>
-      {children}
-    </AgentsContext.Provider>
-  );
+  return <AgentsContext.Provider value={contextValue}>{children}</AgentsContext.Provider>;
 }

@@ -1,5 +1,5 @@
-import { useIsMobile } from "@/hooks/use-mobile"
-import { Button } from "@/components/ui/button"
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from '@/components/ui/dialog';
 import {
   Drawer,
   DrawerClose,
@@ -17,20 +17,15 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
-} from "@/components/ui/drawer"
-import { useEffect, useState } from "react"
-import { SquarePen, Check, X } from "lucide-react" // Import the required icons
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { useAccount, useWalletClient } from "wagmi"
+} from '@/components/ui/drawer';
+import { useEffect, useState } from 'react';
+import { SquarePen, Check, X } from 'lucide-react'; // Import the required icons
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import snapshot from '@snapshot-labs/snapshot.js';
-import { DAVOS_API_ENDPOINT } from "@/lib/constants"
-import { getDelegationStatus } from "@/lib/utils"
-import { toast } from "sonner"
+import { DAVOS_API_ENDPOINT } from '@/lib/constants';
+import { getDelegationStatus } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface SuggestionContentProps {
   isLoading: boolean;
@@ -40,50 +35,109 @@ interface SuggestionContentProps {
 }
 
 // Shared content component to avoid duplication
-const SuggestionContent = ({ isLoading, voteSuggestion, voteReason, isAgentEnabled }: SuggestionContentProps) => (
+const SuggestionContent = ({
+  isLoading,
+  voteSuggestion,
+  voteReason,
+  isAgentEnabled,
+}: SuggestionContentProps) => (
   <>
     {isLoading ? (
       <div className="flex items-center justify-center py-8">
-        <svg className="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        <svg
+          className="animate-spin h-8 w-8 text-primary"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          ></circle>
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
         </svg>
       </div>
     ) : (
       <div className="space-y-4 py-4">
         {voteSuggestion ? (
           <div className="flex flex-col items-center justify-center space-y-2">
-            <div className={`flex items-center justify-center h-24 w-24 rounded-full ${
-              voteSuggestion === "yes" ? "bg-green-100" : "bg-red-100"
-            }`}>
-              {voteSuggestion === "yes" ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            <div
+              className={`flex items-center justify-center h-24 w-24 rounded-full ${
+                voteSuggestion === 'yes' ? 'bg-green-100' : 'bg-red-100'
+              }`}
+            >
+              {voteSuggestion === 'yes' ? (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-12 w-12 text-green-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-12 w-12 text-red-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               )}
             </div>
             <h3 className="text-xl font-medium">
-              {isAgentEnabled ? "Agent will vote" : "Suggested Vote"}: 
-              <span className={`font-bold ${voteSuggestion === "yes" ? "text-green-600" : "text-red-600"}`}>
-                {" "}{voteSuggestion?.toUpperCase()}
+              {isAgentEnabled ? 'Agent will vote' : 'Suggested Vote'}:
+              <span
+                className={`font-bold ${voteSuggestion === 'yes' ? 'text-green-600' : 'text-red-600'}`}
+              >
+                {' '}
+                {voteSuggestion?.toUpperCase()}
               </span>
             </h3>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center space-y-2">
             <div className="flex items-center justify-center h-24 w-24 rounded-full bg-gray-100">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-12 w-12 text-gray-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
               </svg>
             </div>
             <h3 className="text-xl font-medium">Unable to generate suggestion</h3>
           </div>
         )}
-        
+
         <div className="rounded-md bg-muted p-4">
           <h4 className="mb-2 font-medium">Reasoning:</h4>
           <p className="text-sm text-muted-foreground">{voteReason}</p>
@@ -94,37 +148,31 @@ const SuggestionContent = ({ isLoading, voteSuggestion, voteReason, isAgentEnabl
 );
 
 // Content for manual voting dialog
-const ManualVoteContent = ({ 
-  onVoteYes, 
-  onVoteNo, 
-  hasVoted, 
-  userVote 
-}: { 
-  onVoteYes: () => void; 
-  onVoteNo: () => void; 
-  hasVoted: boolean; 
-  userVote: string | null; 
+const ManualVoteContent = ({
+  onVoteYes,
+  onVoteNo,
+  hasVoted,
+  userVote,
+}: {
+  onVoteYes: () => void;
+  onVoteNo: () => void;
+  hasVoted: boolean;
+  userVote: string | null;
 }) => {
   if (hasVoted) {
     return (
       <div className="space-y-6 py-4">
-        <p className="text-center text-muted-foreground">
-          You have already voted on this proposal
-        </p>
+        <p className="text-center text-muted-foreground">You have already voted on this proposal</p>
         <div className="flex justify-center">
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-md ${
-            userVote === 'yes' 
-              ? 'bg-green-100 text-green-700 border border-green-200' 
-              : 'bg-red-100 text-red-700 border border-red-200'
-          }`}>
-            {userVote === 'yes' ? (
-              <Check className="h-5 w-5" />
-            ) : (
-              <X className="h-5 w-5" />
-            )}
-            <span className="font-medium">
-              Voted {userVote === 'yes' ? 'Yes' : 'No'}
-            </span>
+          <div
+            className={`flex items-center gap-2 px-4 py-2 rounded-md ${
+              userVote === 'yes'
+                ? 'bg-green-100 text-green-700 border border-green-200'
+                : 'bg-red-100 text-red-700 border border-red-200'
+            }`}
+          >
+            {userVote === 'yes' ? <Check className="h-5 w-5" /> : <X className="h-5 w-5" />}
+            <span className="font-medium">Voted {userVote === 'yes' ? 'Yes' : 'No'}</span>
           </div>
         </div>
       </div>
@@ -137,15 +185,15 @@ const ManualVoteContent = ({
         Please select your vote for this proposal:
       </p>
       <div className="flex justify-center gap-4">
-        <Button 
-          onClick={onVoteYes} 
-          variant="outline" 
+        <Button
+          onClick={onVoteYes}
+          variant="outline"
           className="flex-1 max-w-xs border-green-300 hover:bg-green-50 hover:text-green-700 cursor-pointer"
         >
           <Check className="mr-2 h-5 w-5 text-green-500" />
           Vote Yes
         </Button>
-        <Button 
+        <Button
           onClick={onVoteNo}
           variant="outline"
           className="flex-1 max-w-xs border-red-300 hover:bg-red-50 hover:text-red-700 cursor-pointer"
@@ -158,16 +206,36 @@ const ManualVoteContent = ({
   );
 };
 
-export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
+interface DrawerDialogProps {
+  proposal: {
+    id: string;
+    title?: string;
+    state?: string;
+    source?: 'snapshot' | 'tally';
+    space?: { id?: string };
+    daoIdentifier?: string;
+    governorAddress?: string;
+    proposalId?: string;
+    tokenAddress?: string;
+    choices?: unknown[];
+  };
+  isAgentEnabled: boolean;
+  voteStatus?: string;
+}
+
+export function DrawerDialog({ proposal, isAgentEnabled, voteStatus }: DrawerDialogProps) {
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
   const [open, setOpen] = useState(false);
   const [manualVoteOpen, setManualVoteOpen] = useState(false);
   const [voteSuggestion, setVoteSuggestion] = useState<string | undefined>(undefined);
   const [voteReason, setVoteReason] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [voteStatusMap, setVoteStatusMap] = useState<{ [proposalId: string]: { hasVoted: boolean; userVote: string | null } }>({});
-  
+  const [voteStatusMap, setVoteStatusMap] = useState<{
+    [proposalId: string]: { hasVoted: boolean; userVote: string | null };
+  }>({});
+
   // Get current proposal's vote status
   const currentVoteStatus = voteStatusMap[proposal?.id] || { hasVoted: false, userVote: null };
   const hasVoted = currentVoteStatus.hasVoted;
@@ -181,6 +249,7 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
       setIsLoading(true);
       getVoteSuggestion();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, proposal]);
 
   const getVoteSuggestion = async () => {
@@ -197,21 +266,19 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
       // Create a unique key for caching based on the directive and proposal body
       // const cacheKey = `${ethos}-${proposal.id}`;
       try {
-        const apiResponse = await fetch(`${DAVOS_API_ENDPOINT}/api/vote-details/${address}/${proposal.id}`, {
-          headers: {
-            'ngrok-skip-browser-warning': 'true'
+        const apiResponse = await fetch(
+          `${DAVOS_API_ENDPOINT}/api/vote-details/${address}/${proposal.id}`,
+          {
+            headers: {
+              'ngrok-skip-browser-warning': 'true',
+            },
           }
-        });
+        );
 
-        console.log('API Response Status:', apiResponse);
-        
         if (apiResponse.ok) {
           const data = await apiResponse.json();
-          console.log('Vote Details Data:', data);
           if (data.success && data.data) {
-            const proposalText = data.data.proposalText;
             const aiReasoning = data.data.aiResponse;
-            console.log(proposalText)
             setVoteSuggestion(data.data.aiVoteChoice);
             setVoteReason(aiReasoning);
             setIsLoading(false);
@@ -237,7 +304,7 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
       console.error('Error parsing query:', error);
     }
   };
-  
+
   const handleManualVote = async (vote: string) => {
     if (!address) {
       console.error('No wallet address available');
@@ -254,11 +321,13 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
     try {
       // Determine vote source from proposal data
       const isSnapshot = proposal?.source === 'snapshot' || (proposal?.space && proposal?.choices);
-      const isTally = proposal?.source === 'tally' || (proposal?.governorAddress && proposal?.proposalId);
+      const isTally =
+        proposal?.source === 'tally' || (proposal?.governorAddress && proposal?.proposalId);
 
       // Check delegation status before voting
       if (isSnapshot) {
-        const spaceId = proposal.space?.id || proposal.space;
+        const spaceId =
+          (typeof proposal.space === 'object' ? proposal.space?.id : proposal.space) || '';
         const delegationStatus = await getDelegationStatus(
           address as `0x${string}`,
           'snapshot',
@@ -268,18 +337,22 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
         );
 
         if (!delegationStatus.exists) {
-          toast.error('You need to delegate your voting power before voting. Please set up your voting agent first.');
+          toast.error(
+            'You need to delegate your voting power before voting. Please set up your voting agent first.'
+          );
           return;
         }
       } else if (isTally) {
         // Extract info for Tally
         const daoIdentifier = proposal.daoIdentifier || proposal.space?.id || '';
         const governorAddressMatch = daoIdentifier.match(/eip155:(\d+):(.+)/);
-        const chainIdFromIdentifier = governorAddressMatch ? parseInt(governorAddressMatch[1], 10) : 42161;
-        
+        const chainIdFromIdentifier = governorAddressMatch
+          ? parseInt(governorAddressMatch[1], 10)
+          : 42161;
+
         // Get token address from proposal if available
         const tokenAddress = proposal.tokenAddress;
-        
+
         if (tokenAddress) {
           const delegationStatus = await getDelegationStatus(
             address as `0x${string}`,
@@ -290,7 +363,9 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
           );
 
           if (!delegationStatus.exists) {
-            toast.error('You need to delegate your voting power before voting. Please set up your voting agent first.');
+            toast.error(
+              'You need to delegate your voting power before voting. Please set up your voting agent first.'
+            );
             return;
           }
         }
@@ -302,36 +377,43 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
         const client = new snapshot.Client712(hub);
         const choice = vote === 'yes' ? 1 : 2; // 1=For, 2=Against
 
-        console.log('Submitting Snapshot vote via client API');
+        const spaceId =
+          (typeof proposal.space === 'object' ? proposal.space?.id : proposal.space) || '';
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const receipt = await client.vote(walletClient as any, address, {
-          space: proposal.space?.id || proposal.space,
+          space: spaceId,
           proposal: proposal.id,
           type: 'single-choice',
           choice: choice,
         });
 
         console.log('Snapshot vote submitted successfully:', receipt);
-
       } else if (isTally) {
         // Tally on-chain voting - call Governor.castVote() directly
         const support = vote === 'yes' ? 1 : 0; // 1=For, 0=Against
-        
+
         // Extract governor address from daoIdentifier (format: eip155:chainId:governorAddress)
         const daoIdentifier = proposal.daoIdentifier || proposal.space?.id || '';
         const governorAddressMatch = daoIdentifier.match(/eip155:\d+:(.+)/);
-        const governorAddress = governorAddressMatch ? governorAddressMatch[1] : proposal.governorAddress;
+        const governorAddress = governorAddressMatch
+          ? governorAddressMatch[1]
+          : proposal.governorAddress;
         const proposalId = proposal.proposalId || proposal.id;
-        
+
         if (!governorAddress || !proposalId) {
-          throw new Error(`Missing Tally vote data - governorAddress: ${governorAddress}, proposalId: ${proposalId}`);
+          throw new Error(
+            `Missing Tally vote data - governorAddress: ${governorAddress}, proposalId: ${proposalId}`
+          );
         }
 
         // Validate we're on the correct network (Arbitrum = chainId 42161)
         const chainId = await walletClient.getChainId();
         if (chainId !== 42161) {
-          throw new Error(`Please switch to Arbitrum network in your wallet. Current network: ${chainId}`);
+          throw new Error(
+            `Please switch to Arbitrum network in your wallet. Current network: ${chainId}`
+          );
         }
-        
+
         // Governor ABI for castVote function
         const governorABI = [
           {
@@ -346,8 +428,6 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
           },
         ];
 
-        console.log('Calling Governor.castVote on:', governorAddress);
-
         try {
           const hash = await walletClient.writeContract({
             address: governorAddress as `0x${string}`,
@@ -355,8 +435,9 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
             functionName: 'castVote',
             args: [BigInt(proposalId), support],
           });
-
-          console.log('Tally vote submitted. Transaction hash:', hash);
+          if (publicClient) {
+            await publicClient.waitForTransactionReceipt({ hash });
+          }
         } catch (contractError) {
           console.error('Contract call failed:', contractError);
           console.error('Error details:', {
@@ -364,9 +445,11 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
             governorAddress,
             proposalId,
             support,
-            voterAddress: address
+            voterAddress: address,
           });
-          throw new Error(`Vote failed: ${contractError instanceof Error ? contractError.message : 'Unknown error'}. Check console for details.`);
+          throw new Error(
+            `Vote failed: ${contractError instanceof Error ? contractError.message : 'Unknown error'}. Check console for details.`
+          );
         }
       } else {
         console.error('Unknown proposal type - neither Snapshot nor Tally detected');
@@ -375,14 +458,12 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
       // Update vote status in persistent map
       setVoteStatusMap(prev => ({
         ...prev,
-        [proposal.id]: { hasVoted: true, userVote: vote }
+        [proposal.id]: { hasVoted: true, userVote: vote },
       }));
-      
+
       setManualVoteOpen(false);
-      console.log(`Vote submitted successfully: ${vote}`);
     } catch (error) {
       console.error('Error submitting vote:', error);
-      console.log(`Vote submission failed: ${vote}`);
     }
   };
 
@@ -390,18 +471,16 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
   const SuggestButtons = () => (
     <div className="flex gap-2">
       <Button variant="outline" size="sm" className="cursor-pointer" onClick={() => setOpen(true)}>
-        {voteStatus === 'yes' || voteStatus === 'no' 
-          ? "Show Agent Reason" 
-          : "Preview Agent Vote"}
+        {voteStatus === 'yes' || voteStatus === 'no' ? 'Show Agent Reason' : 'Preview Agent Vote'}
       </Button>
       {isAgentEnabled && proposal.state?.toLowerCase() === 'active' && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="cursor-pointer" 
+              <Button
+                variant="outline"
+                size="sm"
+                className="cursor-pointer"
                 onClick={() => setManualVoteOpen(true)}
               >
                 <SquarePen className="h-4 w-4" />
@@ -426,9 +505,7 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
               <SuggestButtons />
             ) : (
               <Button variant="outline" size="sm" className="cursor-pointer">
-                {voteStatus === 'yes' || voteStatus === 'no' 
-                  ? "Show Agent Reason" 
-                  : "Suggest"}
+                {voteStatus === 'yes' || voteStatus === 'no' ? 'Show Agent Reason' : 'Suggest'}
               </Button>
             )}
           </DialogTrigger>
@@ -436,8 +513,8 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
             <DialogHeader>
               <DialogTitle>{proposal.title}</DialogTitle>
             </DialogHeader>
-            
-            <SuggestionContent 
+
+            <SuggestionContent
               isLoading={isLoading}
               voteSuggestion={voteSuggestion}
               voteReason={voteReason}
@@ -451,12 +528,10 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Vote Manually</DialogTitle>
-              <DialogDescription>
-                {proposal.title}
-              </DialogDescription>
+              <DialogDescription>{proposal.title}</DialogDescription>
             </DialogHeader>
-            
-            <ManualVoteContent 
+
+            <ManualVoteContent
               onVoteYes={() => handleManualVote('yes')}
               onVoteNo={() => handleManualVote('no')}
               hasVoted={hasVoted}
@@ -476,18 +551,18 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
           {isAgentEnabled ? (
             <div className="flex gap-2">
               <Button variant="outline" className="cursor-pointer">
-                {voteStatus === 'yes' || voteStatus === 'no' 
-                  ? "Show Agent Reason" 
-                  : "Preview Agent Vote"}
+                {voteStatus === 'yes' || voteStatus === 'no'
+                  ? 'Show Agent Reason'
+                  : 'Preview Agent Vote'}
               </Button>
               {proposal.state?.toLowerCase() === 'active' && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        className="cursor-pointer p-2" 
-                        onClick={(e) => {
+                      <Button
+                        variant="outline"
+                        className="cursor-pointer p-2"
+                        onClick={e => {
                           e.stopPropagation(); // Prevent triggering the Preview drawer
                           setManualVoteOpen(true);
                         }}
@@ -503,26 +578,30 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
               )}
             </div>
           ) : (
-            <Button variant="outline" className="cursor-pointer">Suggest</Button>
+            <Button variant="outline" className="cursor-pointer">
+              Suggest
+            </Button>
           )}
         </DrawerTrigger>
         <DrawerContent>
           <DrawerHeader className="text-left">
             <DrawerTitle>{proposal.title}</DrawerTitle>
           </DrawerHeader>
-          
+
           <div className="px-4">
-            <SuggestionContent 
+            <SuggestionContent
               isLoading={isLoading}
               voteSuggestion={voteSuggestion}
               voteReason={voteReason}
               isAgentEnabled={isAgentEnabled}
             />
           </div>
-          
+
           <DrawerFooter className="pt-2">
             <DrawerClose asChild>
-              <Button variant="outline" className="cursor-pointer">Close</Button>
+              <Button variant="outline" className="cursor-pointer">
+                Close
+              </Button>
             </DrawerClose>
           </DrawerFooter>
         </DrawerContent>
@@ -535,19 +614,21 @@ export function DrawerDialog({proposal, isAgentEnabled, voteStatus}: any) {
             <DrawerTitle>Vote Manually</DrawerTitle>
             <DrawerDescription>{proposal.title}</DrawerDescription>
           </DrawerHeader>
-          
+
           <div className="px-4">
-            <ManualVoteContent 
+            <ManualVoteContent
               onVoteYes={() => handleManualVote('yes')}
               onVoteNo={() => handleManualVote('no')}
               hasVoted={hasVoted}
               userVote={userVote}
             />
           </div>
-          
+
           <DrawerFooter className="pt-2">
             <DrawerClose asChild>
-              <Button variant="outline" className="cursor-pointer">Cancel</Button>
+              <Button variant="outline" className="cursor-pointer">
+                Cancel
+              </Button>
             </DrawerClose>
           </DrawerFooter>
         </DrawerContent>
