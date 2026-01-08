@@ -1,4 +1,4 @@
-import { DaoConfigItem, DELEGATE_CONTRACT_ADDRESS, daoConfig } from '@/lib/constants';
+import { DaoConfigItem, DELEGATE_CONTRACT_ADDRESS, daoConfig, CHAIN_IDS } from '@/lib/constants';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
 import DeleGateABI from '@/artifacts/DeleGate.json';
@@ -48,6 +48,7 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
     abi: DeleGateABI.abi,
     functionName: 'getUserSubscriptions',
     args: [address],
+    chainId: CHAIN_IDS.POLYGON, // Always query on Polygon where DeleGate is deployed
     query: {
       enabled: !!address, // Only fetch when address is available
     },
