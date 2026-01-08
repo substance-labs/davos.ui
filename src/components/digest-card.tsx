@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, ReactNode } from 'react';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Mountain } from 'lucide-react';
@@ -11,6 +11,7 @@ interface DigestCardProps {
   isLoading: boolean;
   expandable?: boolean;
   minLengthForToggle?: number;
+  children?: ReactNode;
 }
 
 export function DigestCard({
@@ -19,6 +20,7 @@ export function DigestCard({
   isLoading,
   expandable = true,
   minLengthForToggle = 100,
+  children,
 }: DigestCardProps) {
   const [expanded, setExpanded] = useState(false);
   const showToggle = expandable && summary && summary.length > minLengthForToggle;
@@ -57,6 +59,7 @@ export function DigestCard({
               <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-card to-transparent pointer-events-none" />
             )}
           </div>
+          {children}
         </CardContent>
       ) : null}
     </Card>

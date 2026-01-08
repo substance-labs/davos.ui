@@ -26,12 +26,26 @@ import snapshot from '@snapshot-labs/snapshot.js';
 import { DAVOS_API_ENDPOINT } from '@/lib/constants';
 import { getDelegationStatus } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useEthos } from '@/contexts/ethos';
+
+// Cache for AI suggestion requests - keyed by hash of directive+ethos+proposal
+const suggestionCache = new Map<string, { vote: string; reason: string }>();
+
+// Simple hash function for cache key
+const hashCacheKey = (ethos: string, proposalId: string, proposalBody: string): string => {
+  return `${ethos}::${proposalId}::${proposalBody.substring(0, 500)}`;
+};
 
 interface SuggestionContentProps {
   isLoading: boolean;
   voteSuggestion: string | null | undefined;
   voteReason: string | null | undefined;
   isAgentEnabled: boolean;
+  hasAgentVoted?: boolean;
+  proposalState?: string;
+  onVoteNow?: () => void;
+  canVote?: boolean;
+  votingStartDate?: string;
 }
 
 // Shared content component to avoid duplication
@@ -40,7 +54,26 @@ const SuggestionContent = ({
   voteSuggestion,
   voteReason,
   isAgentEnabled,
-}: SuggestionContentProps) => (
+  hasAgentVoted,
+  proposalState,
+  onVoteNow,
+  canVote,
+  votingStartDate,
+}: SuggestionContentProps) => {
+  // Determine the label based on proposal state and vote status
+  const stateLC = proposalState?.toLowerCase();
+  const isClosed = stateLC === 'closed' || stateLC === 'defeated';
+  const getVoteLabel = () => {
+    if (isClosed && hasAgentVoted) {
+      return 'Agent Voted';
+    } else if (isAgentEnabled) {
+      return 'Agent will vote';
+    } else {
+      return 'Suggested Vote';
+    }
+  };
+
+  return (
   <>
     {isLoading ? (
       <div className="flex items-center justify-center py-8">
@@ -107,7 +140,7 @@ const SuggestionContent = ({
               )}
             </div>
             <h3 className="text-xl font-medium">
-              {isAgentEnabled ? 'Agent will vote' : 'Suggested Vote'}:
+              {getVoteLabel()}:
               <span
                 className={`font-bold ${voteSuggestion === 'yes' ? 'text-green-600' : 'text-red-600'}`}
               >
@@ -142,10 +175,27 @@ const SuggestionContent = ({
           <h4 className="mb-2 font-medium">Reasoning:</h4>
           <p className="text-sm text-muted-foreground">{voteReason}</p>
         </div>
+
+        {onVoteNow && (
+          <Button
+            variant="outline"
+            className="w-full mt-4"
+            onClick={onVoteNow}
+            disabled={!canVote}
+          >
+            {canVote 
+              ? 'Vote now' 
+              : proposalState?.toLowerCase() === 'pending'
+                ? `Manual vote will be enabled when the voting period starts${votingStartDate ? ` on ${votingStartDate}` : ''}`
+                : 'Voting closed'
+            }
+          </Button>
+        )}
       </div>
     )}
   </>
-);
+  );
+};
 
 // Content for manual voting dialog
 const ManualVoteContent = ({
@@ -210,7 +260,10 @@ interface DrawerDialogProps {
   proposal: {
     id: string;
     title?: string;
+    body?: string;
     state?: string;
+    start?: string;
+    startTimestamp?: number;
     source?: 'snapshot' | 'tally';
     space?: { id?: string };
     daoIdentifier?: string;
@@ -227,11 +280,13 @@ export function DrawerDialog({ proposal, isAgentEnabled, voteStatus }: DrawerDia
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
+  const { ethos } = useEthos();
   const [open, setOpen] = useState(false);
   const [manualVoteOpen, setManualVoteOpen] = useState(false);
   const [voteSuggestion, setVoteSuggestion] = useState<string | undefined>(undefined);
   const [voteReason, setVoteReason] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [hasAgentVoted, setHasAgentVoted] = useState<boolean>(false);
   const [voteStatusMap, setVoteStatusMap] = useState<{
     [proposalId: string]: { hasVoted: boolean; userVote: string | null };
   }>({});
@@ -251,6 +306,101 @@ export function DrawerDialog({ proposal, isAgentEnabled, voteStatus }: DrawerDia
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, proposal]);
+
+  // Generate a suggestion on-the-fly using AI when no agent data exists
+  const generateSuggestionOnTheFly = async () => {
+    if (!ethos || !proposal.body) {
+      setHasAgentVoted(false);
+      setVoteSuggestion(undefined);
+      setVoteReason(ethos ? 'No proposal content available.' : 'Please configure your ethos in Profile settings to get vote suggestions.');
+      setIsLoading(false);
+      return;
+    }
+
+    // Check cache first
+    const cacheKey = hashCacheKey(ethos, proposal.id, proposal.body);
+    const cached = suggestionCache.get(cacheKey);
+    if (cached) {
+      setHasAgentVoted(false);
+      setVoteSuggestion(cached.vote as 'yes' | 'no');
+      setVoteReason(cached.reason);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Use the standard AI directive that expects JSON response
+      const aiDirective = `Suggest a vote for the passed proposal based on the ethos of the user. The result must be only a JSON with two elements: 'vote', which can be yes or no, and 'reason', which is the explanation of the reasons considered for the voting decision. The JSON must be formatted as follows: {"vote": "yes", "reason": "..."}.`;
+      
+      // Format: ethos first, then proposal
+      const proposalContent = `User Ethos: ${ethos}\n\nProposal Title: ${proposal.title}\n\nProposal Content: ${proposal.body}`;
+
+      const response = await fetch(`${DAVOS_API_ENDPOINT}/api/ai-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: JSON.stringify({
+          directive: aiDirective,
+          proposal: proposalContent,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.response) {
+          // Parse the JSON response from AI
+          try {
+            const jsonResponse = JSON.parse(data.response);
+            const voteChoice = jsonResponse.vote?.toLowerCase() === 'yes' ? 'yes' : 'no';
+            const reason = jsonResponse.reason || data.response;
+            
+            // Cache the result
+            suggestionCache.set(cacheKey, { vote: voteChoice, reason });
+            
+            setHasAgentVoted(false);
+            setVoteSuggestion(voteChoice);
+            setVoteReason(reason);
+            setIsLoading(false);
+            return;
+          } catch {
+            // Fallback: try to extract from non-JSON response
+            const aiResponse = data.response.toLowerCase();
+            let voteChoice: 'yes' | 'no' | undefined;
+            
+            if (aiResponse.includes('"vote": "yes"') || aiResponse.includes("'vote': 'yes'")) {
+              voteChoice = 'yes';
+            } else if (aiResponse.includes('"vote": "no"') || aiResponse.includes("'vote': 'no'")) {
+              voteChoice = 'no';
+            }
+
+            // Cache if we got a vote choice
+            if (voteChoice) {
+              suggestionCache.set(cacheKey, { vote: voteChoice, reason: data.response });
+            }
+
+            setHasAgentVoted(false);
+            setVoteSuggestion(voteChoice);
+            setVoteReason(data.response);
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
+      
+      setHasAgentVoted(false);
+      setVoteSuggestion(undefined);
+      setVoteReason('Unable to generate suggestion.');
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error generating suggestion:', error);
+      setHasAgentVoted(false);
+      setVoteSuggestion(undefined);
+      setVoteReason('Error generating suggestion.');
+      setIsLoading(false);
+    }
+  };
 
   const getVoteSuggestion = async () => {
     try {
@@ -278,24 +428,29 @@ export function DrawerDialog({ proposal, isAgentEnabled, voteStatus }: DrawerDia
         if (apiResponse.ok) {
           const data = await apiResponse.json();
           if (data.success && data.data) {
-            const aiReasoning = data.data.aiResponse;
-            setVoteSuggestion(data.data.aiVoteChoice);
-            setVoteReason(aiReasoning);
+            // Check if the agent has actually voted (status is 'voted')
+            const isVoted = data.data.status === 'voted';
+            setHasAgentVoted(isVoted);
+            
+            // For closed proposals with actual votes, use the actual vote choice
+            // Otherwise use the AI suggestion
+            const actualVote = data.data.userVoteChoice || data.data.aiVoteChoice;
+            setVoteSuggestion(actualVote);
+            setVoteReason(data.data.aiResponse);
             setIsLoading(false);
           } else {
-            setVoteSuggestion(undefined);
-            setVoteReason('No suggestion available.');
-            setIsLoading(false);
+            // No agent data - generate suggestion on-the-fly if ethos available
+            await generateSuggestionOnTheFly();
           }
         } else {
-          setVoteSuggestion(undefined);
-          setVoteReason('No suggestion available.');
-          setIsLoading(false);
+          // API error - try generating suggestion on-the-fly
+          await generateSuggestionOnTheFly();
         }
       } catch (error) {
         console.error('Error fetching vote details:', error);
         console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
         console.error('Current proposal object:', proposal);
+        setHasAgentVoted(false);
         setVoteSuggestion(undefined);
         setVoteReason('Error fetching vote details');
         setIsLoading(false);
@@ -468,32 +623,47 @@ export function DrawerDialog({ proposal, isAgentEnabled, voteStatus }: DrawerDia
   };
 
   // Preview Vote + Manual Vote button for desktop
-  const SuggestButtons = () => (
-    <div className="flex gap-2">
-      <Button variant="outline" size="sm" className="cursor-pointer" onClick={() => setOpen(true)}>
-        {voteStatus === 'yes' || voteStatus === 'no' ? 'Show Agent Reason' : 'Preview Agent Vote'}
-      </Button>
-      {isAgentEnabled && proposal.state?.toLowerCase() === 'active' && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="cursor-pointer"
-                onClick={() => setManualVoteOpen(true)}
-              >
-                <SquarePen className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Vote Manually</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
-    </div>
-  );
+  const stateLC = proposal.state?.toLowerCase();
+  const isClosed = stateLC === 'closed' || stateLC === 'defeated';
+  const hasVoteResult = voteStatus === 'yes' || voteStatus === 'no';
+  const isButtonDisabled = isClosed && !hasVoteResult;
+
+  const SuggestButtons = () => {
+    const isProposalActive = proposal.state?.toLowerCase() === 'active';
+    return (
+      <div className="flex gap-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="cursor-pointer" 
+          onClick={() => setOpen(true)}
+          disabled={isButtonDisabled}
+        >
+          {hasVoteResult ? 'Show Agent Reason' : isClosed ? 'No Agent Vote' : 'Preview Agent Vote'}
+        </Button>
+        {isAgentEnabled && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="cursor-pointer"
+                  onClick={() => setManualVoteOpen(true)}
+                  disabled={!isProposalActive}
+                >
+                  <SquarePen className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{isProposalActive ? 'Vote Manually' : 'Voting closed'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
+    );
+  };
 
   if (isDesktop) {
     return (
@@ -504,8 +674,13 @@ export function DrawerDialog({ proposal, isAgentEnabled, voteStatus }: DrawerDia
             {isAgentEnabled ? (
               <SuggestButtons />
             ) : (
-              <Button variant="outline" size="sm" className="cursor-pointer">
-                {voteStatus === 'yes' || voteStatus === 'no' ? 'Show Agent Reason' : 'Suggest'}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="cursor-pointer"
+                disabled={isClosed && !hasVoteResult}
+              >
+                {hasVoteResult ? 'Show Agent Reason' : isClosed ? 'No Agent Vote' : 'Suggest'}
               </Button>
             )}
           </DialogTrigger>
@@ -519,6 +694,14 @@ export function DrawerDialog({ proposal, isAgentEnabled, voteStatus }: DrawerDia
               voteSuggestion={voteSuggestion}
               voteReason={voteReason}
               isAgentEnabled={isAgentEnabled}
+              hasAgentVoted={hasAgentVoted}
+              proposalState={proposal.state}
+              onVoteNow={() => {
+                setOpen(false);
+                setManualVoteOpen(true);
+              }}
+              canVote={proposal.state?.toLowerCase() === 'active'}
+              votingStartDate={proposal.start}
             />
           </DialogContent>
         </Dialog>
@@ -550,32 +733,33 @@ export function DrawerDialog({ proposal, isAgentEnabled, voteStatus }: DrawerDia
         <DrawerTrigger asChild>
           {isAgentEnabled ? (
             <div className="flex gap-2">
-              <Button variant="outline" className="cursor-pointer">
-                {voteStatus === 'yes' || voteStatus === 'no'
-                  ? 'Show Agent Reason'
-                  : 'Preview Agent Vote'}
+              <Button 
+                variant="outline" 
+                className="cursor-pointer"
+                disabled={isButtonDisabled}
+              >
+                {hasVoteResult ? 'Show Agent Reason' : isClosed ? 'No Agent Vote' : 'Preview Agent Vote'}
               </Button>
-              {proposal.state?.toLowerCase() === 'active' && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="cursor-pointer p-2"
-                        onClick={e => {
-                          e.stopPropagation(); // Prevent triggering the Preview drawer
-                          setManualVoteOpen(true);
-                        }}
-                      >
-                        <SquarePen className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Vote Manually</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="cursor-pointer p-2"
+                      onClick={e => {
+                        e.stopPropagation(); // Prevent triggering the Preview drawer
+                        setManualVoteOpen(true);
+                      }}
+                      disabled={proposal.state?.toLowerCase() !== 'active'}
+                    >
+                      <SquarePen className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{proposal.state?.toLowerCase() === 'active' ? 'Vote Manually' : 'Voting closed'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           ) : (
             <Button variant="outline" className="cursor-pointer">
@@ -594,6 +778,14 @@ export function DrawerDialog({ proposal, isAgentEnabled, voteStatus }: DrawerDia
               voteSuggestion={voteSuggestion}
               voteReason={voteReason}
               isAgentEnabled={isAgentEnabled}
+              hasAgentVoted={hasAgentVoted}
+              proposalState={proposal.state}
+              onVoteNow={() => {
+                setOpen(false);
+                setManualVoteOpen(true);
+              }}
+              canVote={proposal.state?.toLowerCase() === 'active'}
+              votingStartDate={proposal.start}
             />
           </div>
 

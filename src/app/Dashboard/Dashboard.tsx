@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, NavLink } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -11,9 +11,9 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, FileSymlink, Cpu, Star } from 'lucide-react';
+import { ExternalLink, Cpu, Star } from 'lucide-react';
 import { useSubscriptions } from '@/contexts/subscriptions';
-import { daoConfig, DaoConfigItem, MONTHLY_REPORT_DIRECTIVE } from '@/lib/constants';
+import { daoConfig, DaoConfigItem, MONTHLY_REPORT_DIRECTIVE, DAVOS_API_ENDPOINT } from '@/lib/constants';
 import { toast } from 'sonner';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { DrawerDialog } from '../Suggest/Suggest';
@@ -55,6 +55,7 @@ interface ProposalData {
   body: string;
   state: string;
   start: string;
+  startTimestamp: number;
   end: string;
   endTimestamp: number;
   votes: number | string;
@@ -74,6 +75,7 @@ function getStateVariant(state: string): BadgeVariant {
   const stateMap: Record<string, BadgeVariant> = {
     active: 'default',
     closed: 'secondary',
+    defeated: 'secondary',
     pending: 'outline',
     rejected: 'destructive',
   };
@@ -118,7 +120,8 @@ function transformProposals(
     title: proposal.title,
     body: proposal.description,
     state: proposal.state,
-    start: formatTimestamp(proposal.startTime),
+    start: formatTimestamp(proposal.startTime, true),
+    startTimestamp: proposal.startTime,
     end: formatTimestamp(proposal.endTime, true),
     endTimestamp: proposal.endTime,
     votes: proposal.votes,
@@ -268,6 +271,55 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
   // Transform proposals to table format and calculate pagination
   const proposalTableData = useMemo(() => transformProposals(proposals, dao), [proposals, dao]);
 
+  // Store vote details fetched from the API for closed proposals
+  const [voteDetailsMap, setVoteDetailsMap] = useState<Record<string, { status: string; voteChoice: string | null }>>({});
+
+  // Fetch vote details for proposals when agent is enabled
+  const fetchVoteDetails = useCallback(async (proposalId: string) => {
+    if (!account.address) return null;
+    try {
+      const response = await fetch(`${DAVOS_API_ENDPOINT}/api/vote-details/${account.address}/${proposalId}`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (data.data) {
+        const voteChoice = data.data.status === 'voted' 
+          ? (data.data.userVoteChoice ?? data.data.aiVoteChoice) 
+          : null;
+        return { status: data.data.status, voteChoice };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching vote details:', error);
+      return null;
+    }
+  }, [account.address]);
+
+  // Fetch vote details for all closed proposals when agent is enabled
+  useEffect(() => {
+    if (!enabledAgent || !account.address || proposalTableData.length === 0) return;
+
+    const closedProposals = proposalTableData.filter(
+      p => p.state.toLowerCase() !== 'active' && p.state.toLowerCase() !== 'pending'
+    );
+
+    const fetchAllDetails = async () => {
+      const newDetailsMap: Record<string, { status: string; voteChoice: string | null }> = {};
+      
+      await Promise.all(
+        closedProposals.map(async (proposal) => {
+          const details = await fetchVoteDetails(proposal.id);
+          if (details) {
+            newDetailsMap[proposal.id] = details;
+          }
+        })
+      );
+
+      setVoteDetailsMap(prev => ({ ...prev, ...newDetailsMap }));
+    };
+
+    fetchAllDetails();
+  }, [enabledAgent, account.address, proposalTableData, fetchVoteDetails]);
+
   const totalPages = Math.max(1, Math.ceil(proposalTableData.length / PROPOSALS_PER_PAGE));
   const indexOfLastProposal = currentPage * PROPOSALS_PER_PAGE;
   const indexOfFirstProposal = indexOfLastProposal - PROPOSALS_PER_PAGE;
@@ -281,32 +333,21 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
 
   // Get current page proposals with vote status added
   const currentProposals = useMemo(() => {
-    // First, filter out all non-active proposals
-    const inactiveProposals = proposalTableData.filter(
-      proposal => proposal.state.toLowerCase() !== 'active'
-    );
-
     return proposalTableData.slice(indexOfFirstProposal, indexOfLastProposal).map(proposal => {
       let voteStatus: 'yes' | 'no' | 'not-voted' | null = null;
 
-      if (proposal.state.toLowerCase() === 'active') {
-        // Active proposals have undefined vote status
+      if (proposal.state.toLowerCase() === 'active' || proposal.state.toLowerCase() === 'pending') {
+        // Active/pending proposals have undefined vote status
         voteStatus = null;
-      } else {
-        // Find the index of this proposal in the list of inactive proposals
-        const inactiveIndex = inactiveProposals.findIndex(p => p.id === proposal.id);
-
-        console.log(`Proposal ID: ${proposal.id}, Inactive Index: ${inactiveIndex}`);
-        console.log(`Proposal:`, { ...proposal, body: undefined });
-
-        // Only first 3 non-active proposals get "voted yes"
-        // if (inactiveIndex <= 2) {
-        //   voteStatus = 'yes';
-        // } else if (inactiveIndex == 3) {
-        //   voteStatus = 'no';
-        // } else {
-        //   voteStatus = 'not-voted';
-        // }
+      } else if (enabledAgent) {
+        // For closed proposals with agent enabled, check the fetched vote details
+        const details = voteDetailsMap[proposal.id];
+        if (details && details.status === 'voted' && details.voteChoice !== null) {
+          // voteChoice is already 'yes' or 'no' string from the API
+          voteStatus = details.voteChoice === 'yes' ? 'yes' : 'no';
+        } else if (details && details.status === 'expired') {
+          voteStatus = 'not-voted';
+        }
       }
 
       return {
@@ -314,7 +355,7 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
         voteStatus,
       };
     });
-  }, [proposalTableData, indexOfFirstProposal, indexOfLastProposal]);
+  }, [proposalTableData, indexOfFirstProposal, indexOfLastProposal, enabledAgent, voteDetailsMap]);
 
   // Handle page changes
   const handlePageChange = (pageNumber: number) => {
@@ -461,13 +502,37 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
         {/* Monthly Digest Card */}
         {hasAgent(dao) && (
           <div className="px-4 lg:px-6">
-            <Card className="border shadow-sm gap-0 pt-4 pb-3 bg-muted/5">
+            <Card>
               <CardHeader className="pb-0">
                 <CardTitle className="text-sm flex items-center">
                   <span className={ICON_WRAPPER_CLASS}>
                     <Cpu className={ICON_CLASS} />
                   </span>
                   Your Voting Agent Configuration
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <p className="text-sm mb-4">{ethos}</p>
+                <NavLink to="/profile">
+                  <Button variant="outline" className="w-full">
+                    Configure Ethos
+                  </Button>
+                </NavLink>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Ethos Card - shown when agent is not active */}
+        {!hasAgent(dao) && ethos && (
+          <div className="px-4 lg:px-6">
+            <Card>
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm flex items-center">
+                  <span className={ICON_WRAPPER_CLASS}>
+                    <Cpu className={ICON_CLASS} />
+                  </span>
+                  Your Ethos
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
@@ -489,20 +554,16 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
             summary={daoSummary || null}
             isLoading={loadingSummary}
             minLengthForToggle={SUMMARY_MIN_LENGTH_FOR_TOGGLE}
-          />
-          {daoSummary && !loadingSummary && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="text-xs h-6 mt-4 px-2 flex items-center gap-1"
-              asChild
-            >
-              <a href={`/#/digest/monthly?dao=${dao.name.toLowerCase()}`}>
-                <FileSymlink className="h-3 w-3" />
-                Full Digest
-              </a>
-            </Button>
-          )}
+          >
+            {daoSummary && !loadingSummary && (
+              <Button variant="outline" className="w-full mt-4" asChild>
+                <a href={`/#/digest/monthly?dao=${dao.name.toLowerCase()}`}>
+                  {/* <FileSymlink className="h-4 w-4 mr-2" /> */}
+                  Full Digest
+                </a>
+              </Button>
+            )}
+          </DigestCard>
         </div>
 
         {/* Proposals Table with Pagination */}
