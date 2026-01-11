@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useChainId, useSwitchChain } from 'wagmi';
 import { toast } from 'sonner';
 import { getDelegationStatus } from '@/lib/utils';
+import { CHAIN_IDS } from '@/lib/constants';
 
 interface UseDelegationVerificationProps {
   userAddress: `0x${string}` | undefined;
@@ -45,6 +46,23 @@ export function useDelegationVerification({
     } catch (error) {
       console.error('Network switch failed:', error);
       toast.error(`Failed to switch to ${daoName} network`);
+      return false;
+    }
+  };
+
+  const switchToPolygon = async () => {
+    if (!switchChain) {
+      toast.error('Wallet connection error');
+      return false;
+    }
+
+    try {
+      await switchChain({ chainId: CHAIN_IDS.POLYGON });
+      toast.success('Switched to Polygon network');
+      return true;
+    } catch (error) {
+      console.error('Network switch to Polygon failed:', error);
+      toast.error('Failed to switch to Polygon network');
       return false;
     }
   };
@@ -117,6 +135,7 @@ export function useDelegationVerification({
     error,
     isWrongNetwork,
     switchToCorrectNetwork,
+    switchToPolygon,
     verifyDelegation,
     checkExistingDelegation,
     setDelegationExists,

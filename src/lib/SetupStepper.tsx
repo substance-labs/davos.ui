@@ -31,28 +31,13 @@ export const STEP_CONFIG = {
     },
   ],
   automatic: [
-    { id: 'delegate-tokens', title: 'Delegation', description: 'Delegate your tokens on-chain.' },
     {
       id: 'predict-address',
       title: 'Address Prediction',
       description: 'Predicting agent address.',
     },
-    {
-      id: 'verify-delegation',
-      title: 'Verify Delegation',
-      description: 'Verifying delegation on-chain.',
-    },
-    {
-      id: 'create-kms-adapter',
-      title: 'Security Setup',
-      description: 'Setting up security infrastructure.',
-    },
+    { id: 'delegate-tokens', title: 'Delegation', description: 'Delegate your tokens on-chain.' },
     { id: 'create-agent', title: 'Agent Creation', description: 'Creating your voting agent.' },
-    {
-      id: 'enable-agent',
-      title: 'Agent Activation',
-      description: 'Activating the agent on-chain.',
-    },
     { id: 'complete', title: 'Setup Complete', description: 'Your agent is ready.' },
   ],
   manual: [
@@ -91,17 +76,15 @@ export function SetupStepper({
   isAutomaticFlow,
 }: SetupStepperProps) {
   let config: StepConfig[];
-  let _configNameForLog: string;
   let stepperKey: string;
 
-  if (isAutoDelegationProcessActive) {
-    config = STEP_CONFIG.base;
-    _configNameForLog = 'base (forced for active auto setup process)';
-    stepperKey = 'stepper-base';
+  // When auto-delegation is active, use the automatic config to show delegation step
+  if (isAutoDelegationProcessActive || isAutomaticFlow) {
+    config = STEP_CONFIG.automatic;
+    stepperKey = 'stepper-automatic';
   } else {
-    config = isAutomaticFlow ? STEP_CONFIG.automatic : STEP_CONFIG.base;
-    _configNameForLog = isAutomaticFlow ? 'automatic (DAO default)' : 'base (DAO default)';
-    stepperKey = `stepper-${_configNameForLog.startsWith('base') ? 'base' : 'automatic'}`;
+    config = STEP_CONFIG.base;
+    stepperKey = 'stepper-base';
   }
 
   return (

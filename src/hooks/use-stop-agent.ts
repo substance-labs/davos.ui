@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { CHAIN_IDS } from '@/lib/constants';
 
 interface UseStopAgentProps {
   userAddress?: string;
   chainId: number;
   daoName: string;
   daoChainId: number;
+  daoSource: 'snapshot' | 'tally';
   setDelegating: (delegating: boolean) => void;
   setDelegated: (delegated: boolean) => void;
   setShowStopConfirmation: (show: boolean) => void;
@@ -13,6 +15,7 @@ interface UseStopAgentProps {
   stopAgentAndRevoke: () => Promise<boolean>;
   stopAgentOnly: () => Promise<boolean>;
   switchToCorrectNetwork: () => Promise<boolean>;
+  switchToPolygon: () => Promise<boolean>;
 }
 
 export function useStopAgent({
@@ -20,6 +23,7 @@ export function useStopAgent({
   chainId,
   daoName,
   daoChainId,
+  daoSource,
   setDelegating,
   setDelegated,
   setShowStopConfirmation,
@@ -27,6 +31,7 @@ export function useStopAgent({
   stopAgentAndRevoke,
   stopAgentOnly,
   switchToCorrectNetwork,
+  switchToPolygon,
 }: UseStopAgentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -36,11 +41,18 @@ export function useStopAgent({
     setError(null);
 
     try {
-      if (chainId !== daoChainId) {
-        toast.info(`Switching to ${daoName} network...`);
-        const switched = await switchToCorrectNetwork();
+      // For Snapshot DAOs, we need to be on Polygon for delegation operations
+      // For Tally DAOs, we need to be on the DAO's chain for token delegation
+      const requiredChainId = daoSource === 'snapshot' ? CHAIN_IDS.POLYGON : daoChainId;
+      const networkName = daoSource === 'snapshot' ? 'Polygon' : daoName;
+
+      if (chainId !== requiredChainId) {
+        toast.info(`Switching to ${networkName} network...`);
+        const switched = daoSource === 'snapshot' 
+          ? await switchToPolygon() 
+          : await switchToCorrectNetwork();
         if (!switched) {
-          throw new Error(`Failed to switch to ${daoName} network`);
+          throw new Error(`Failed to switch to ${networkName} network`);
         }
       }
 

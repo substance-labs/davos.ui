@@ -257,7 +257,7 @@ export function useAgentSetup({
       }
 
       // Use source-aware delegation function to support both Snapshot and Tally
-      await delegateOnChainWithSource(
+      const result = await delegateOnChainWithSource(
         publicClient,
         dao.source,
         dao.identifier,
@@ -267,6 +267,12 @@ export function useAgentSetup({
         dao.tokenAddress as `0x${string}`,
         dao.chainId
       );
+
+      // Check if already delegated (no transaction needed)
+      if (result && 'alreadyDelegated' in result && result.alreadyDelegated) {
+        toast.success('Already delegated to agent!');
+        return true;
+      }
 
       toast.success('Delegation successful!');
       return true;

@@ -494,11 +494,16 @@ type AsChildProps<T extends React.ElementType> = React.ComponentProps<T> & {
   asChild?: boolean;
 };
 
+// All possible step IDs across all flows (base, automatic, manual)
+// The Stepper needs to know about all possible steps to avoid undefined errors
 const steps = [
-  { id: 'create-kms-adapter' },
-  { id: 'create-agent' },
-  { id: 'enable-agent' },
-  { id: 'complete' },
+  { id: 'predict-address' },    // automatic flow
+  { id: 'delegate-tokens' },    // automatic flow
+  { id: 'verify-delegation' },  // automatic flow (optional)
+  { id: 'create-kms-adapter' }, // base/manual flow
+  { id: 'create-agent' },       // all flows
+  { id: 'enable-agent' },       // base/manual flow
+  { id: 'complete' },           // all flows
 ] as const;
 
 // 2. Call defineStepper to produce the real runtime object

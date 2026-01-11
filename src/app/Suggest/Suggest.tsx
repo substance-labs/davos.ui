@@ -27,6 +27,31 @@ import { DAVOS_API_ENDPOINT } from '@/lib/constants';
 import { getDelegationStatus } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useEthos } from '@/contexts/ethos';
+import type { WalletClient } from 'viem';
+
+// Adapter to make viem's WalletClient compatible with Snapshot.js (which expects ethers.js signer)
+function createSnapshotSigner(walletClient: WalletClient, address: `0x${string}`) {
+  return {
+    getAddress: async () => address,
+    _signTypedData: async (
+      domain: Record<string, unknown>,
+      types: Record<string, Array<{ name: string; type: string }>>,
+      value: Record<string, unknown>
+    ) => {
+      // Remove EIP712Domain from types if present (viem adds it automatically)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { EIP712Domain: _, ...typesWithoutDomain } = types;
+      
+      return walletClient.signTypedData({
+        account: address,
+        domain: domain as Parameters<typeof walletClient.signTypedData>[0]['domain'],
+        types: typesWithoutDomain,
+        primaryType: Object.keys(typesWithoutDomain)[0],
+        message: value,
+      });
+    },
+  };
+}
 
 // Cache for AI suggestion requests - keyed by hash of directive+ethos+proposal
 const suggestionCache = new Map<string, { vote: string; reason: string }>();
@@ -534,8 +559,12 @@ export function DrawerDialog({ proposal, isAgentEnabled, voteStatus }: DrawerDia
 
         const spaceId =
           (typeof proposal.space === 'object' ? proposal.space?.id : proposal.space) || '';
+        
+        // Create a signer adapter for Snapshot.js (it expects ethers.js signer interface)
+        const signer = createSnapshotSigner(walletClient, address as `0x${string}`);
+        
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const receipt = await client.vote(walletClient as any, address, {
+        const receipt = await client.vote(signer as any, address, {
           space: spaceId,
           proposal: proposal.id,
           type: 'single-choice',

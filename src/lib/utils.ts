@@ -4,7 +4,7 @@
 
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { DAVOS_API_ENDPOINT, SNAPSHOT_DELEGATION_REGISTRY, ZERO_ADDRESS } from './constants';
+import { DAVOS_API_ENDPOINT, SNAPSHOT_DELEGATION_REGISTRY, ZERO_ADDRESS, CHAIN_IDS } from './constants';
 import { HDKey, hdKeyToAccount } from 'viem/accounts';
 import {
   toHex,
@@ -12,14 +12,35 @@ import {
   Address,
   keccak256,
   stringToBytes,
-  WriteContractParameters,
   Abi,
+  createPublicClient,
+  http,
 } from 'viem';
-import { readContract } from 'wagmi/actions';
+import { polygon, mainnet, arbitrum } from 'viem/chains';
+import { readContract, getChainId, switchChain } from 'wagmi/actions';
 import { config } from './wagmi';
 import SnapshotDelegationRegistryABIRaw from '@/artifacts/SnapshotDelegationRegistry.json';
 import type { PublicClient } from 'viem';
 import { logger } from './logger';
+
+// Create a dedicated Polygon public client for Snapshot operations
+export const polygonPublicClient = createPublicClient({
+  chain: polygon,
+  transport: http('https://polygon-rpc.com'),
+});
+
+// Create a dedicated Ethereum mainnet public client for token-native delegation
+// Using publicnode which supports CORS for browser requests
+export const ethereumPublicClient = createPublicClient({
+  chain: mainnet,
+  transport: http('https://ethereum-rpc.publicnode.com'),
+});
+
+// Create a dedicated Arbitrum public client for ARB token delegation
+export const arbitrumPublicClient = createPublicClient({
+  chain: arbitrum,
+  transport: http('https://arb1.arbitrum.io/rpc'),
+});
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -27,9 +48,27 @@ import { logger } from './logger';
 
 const SnapshotDelegationRegistryABI = SnapshotDelegationRegistryABIRaw as Abi;
 
-type WriteContractAsync = <const config extends WriteContractParameters>(
-  variables: config
-) => Promise<`0x${string}`>;
+// ABI for tokens with native delegate() function (AAVE, UNI, COMP, etc.)
+const TokenDelegationABI = [
+  {
+    name: 'delegate',
+    type: 'function',
+    inputs: [{ name: 'delegatee', type: 'address' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    name: 'delegates',
+    type: 'function',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+// WriteContractAsync type - accepts any parameters that wagmi's writeContractAsync accepts
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type WriteContractAsync = (variables: any) => Promise<`0x${string}`>;
 
 // ============================================================================
 // ENVIRONMENT HELPERS
@@ -408,6 +447,7 @@ export async function getDelegationStatusLegacy(
 
 /**
  * Verify on‐chain that `delegator` really delegated to `expected`.
+ * Uses dedicated Ethereum client for reliability.
  */
 export const verifyBlockchainDelegation = async (
   spaceId: string,
@@ -426,21 +466,30 @@ export const verifyBlockchainDelegation = async (
   }
 
   const id = keccak256(stringToBytes(spaceId));
-  const actual = (await readContract(config, {
-    address: SNAPSHOT_DELEGATION_REGISTRY,
-    abi: SnapshotDelegationRegistryABI,
-    functionName: 'delegation',
-    args: [delegator, id],
-  })) as `0x${string}`;
-  const want = expected?.toLowerCase() ?? ZERO_ADDRESS;
-  return actual.toLowerCase() === want;
+  
+  try {
+    // Use dedicated Ethereum client instead of wagmi config for better reliability
+    const actual = await ethereumPublicClient.readContract({
+      address: SNAPSHOT_DELEGATION_REGISTRY,
+      abi: SnapshotDelegationRegistryABI,
+      functionName: 'delegation',
+      args: [delegator, id],
+    }) as `0x${string}`;
+    const want = expected?.toLowerCase() ?? ZERO_ADDRESS;
+    return actual.toLowerCase() === want;
+  } catch (error) {
+    console.error('[verifyBlockchainDelegation] Error:', error);
+    // On error, return false rather than throwing
+    return false;
+  }
 };
 
 /**
  * Set on‐chain delegation to `delegatee.` (legacy)
+ * Uses dedicated Polygon client for all read operations since the registry is on Polygon
  */
 export async function delegateOnChainLegacy(
-  client: PublicClient,
+  _client: PublicClient, // Not used - we use polygonPublicClient instead
   spaceId: string,
   delegator: `0x${string}`,
   delegatee: `0x${string}`,
@@ -458,8 +507,9 @@ export async function delegateOnChainLegacy(
 
   const id = keccak256(stringToBytes(spaceId));
 
+  // Use Polygon client to read current delegation
   try {
-    const currentDelegate = (await client.readContract({
+    const currentDelegate = (await polygonPublicClient.readContract({
       address: SNAPSHOT_DELEGATION_REGISTRY,
       abi: SnapshotDelegationRegistryABI,
       functionName: 'delegation',
@@ -477,8 +527,9 @@ export async function delegateOnChainLegacy(
   let maxFeePerGas: bigint | undefined;
   let maxPriorityFeePerGas: bigint | undefined;
 
+  // Use Polygon client for gas estimation
   try {
-    gas = await client.estimateContractGas({
+    gas = await polygonPublicClient.estimateContractGas({
       account: delegator,
       address: SNAPSHOT_DELEGATION_REGISTRY,
       abi: SnapshotDelegationRegistryABI,
@@ -489,8 +540,9 @@ export async function delegateOnChainLegacy(
     console.warn('[Delegation] Unable to estimate gas for Snapshot delegation:', gasError);
   }
 
+  // Use Polygon client for fee estimation
   try {
-    const fees = await client.estimateFeesPerGas();
+    const fees = await polygonPublicClient.estimateFeesPerGas();
     maxFeePerGas = fees.maxFeePerGas;
     maxPriorityFeePerGas = fees.maxPriorityFeePerGas;
   } catch (feesError) {
@@ -503,16 +555,21 @@ export async function delegateOnChainLegacy(
     functionName: 'setDelegate',
     args: [id, delegatee],
     account: delegator,
-    chain: client.chain,
+    // Snapshot Delegation Registry is always on Polygon
+    chainId: CHAIN_IDS.POLYGON,
     gas: gas ? (gas * 120n) / 100n : undefined,
     maxFeePerGas,
     maxPriorityFeePerGas,
   });
 
+  // Use Polygon client to wait for transaction receipt with timeout
   try {
-    await client.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+    await Promise.race([
+      polygonPublicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Receipt timeout')), 30000))
+    ]);
   } catch (receiptError) {
-    console.warn('[Delegation] Unable to confirm legacy delegation receipt:', receiptError);
+    console.warn('[Delegation] Unable to confirm legacy delegation receipt (may still succeed):', receiptError);
   }
 
   return { hash: txHash };
@@ -584,6 +641,7 @@ export async function getSnapshotDelegation(
       abi: SnapshotDelegationRegistryABI,
       functionName: 'delegation',
       args: [user, id],
+      chainId: CHAIN_IDS.POLYGON, // Snapshot Delegation Registry is on Polygon
     })) as `0x${string}`;
 
     const exists = delegatee.toLowerCase() !== ZERO_ADDRESS;
@@ -746,11 +804,324 @@ export async function delegateTallyOnChain(
   }
 }
 
+// ============================================================================
+// CUSTOM DELEGATION HANDLERS
+// ============================================================================
+
+/**
+ * Type for custom delegation handler functions
+ */
+type CustomDelegationHandler = (
+  delegator: `0x${string}`,
+  delegatee: `0x${string}`,
+  writeContractAsync: WriteContractAsync,
+  tokenAddress?: `0x${string}`,
+  chainId?: number
+) => Promise<{ hash: string | null; alreadyDelegated?: boolean }>;
+
+/**
+ * Delegate using token-native delegate() function
+ * Used by tokens like AAVE, UNI, COMP that have built-in delegation
+ */
+async function delegateTokenNative(
+  delegator: `0x${string}`,
+  delegatee: `0x${string}`,
+  writeContractAsync: WriteContractAsync,
+  tokenAddress: `0x${string}`,
+  chainId: number,
+  publicClient: ReturnType<typeof createPublicClient>
+): Promise<{ hash: string | null; alreadyDelegated?: boolean }> {
+  console.log('[Delegation] Using token-native delegation...', {
+    tokenAddress,
+    delegator,
+    delegatee,
+    chainId,
+  });
+
+  // Check current delegate
+  try {
+    const currentDelegate = await publicClient.readContract({
+      address: tokenAddress,
+      abi: TokenDelegationABI,
+      functionName: 'delegates',
+      args: [delegator],
+    }) as `0x${string}`;
+
+    if (currentDelegate?.toLowerCase() === delegatee.toLowerCase()) {
+      console.log('[Delegation] Already delegated to this address');
+      return { hash: null, alreadyDelegated: true };
+    }
+    console.log('[Delegation] Current delegate:', currentDelegate);
+  } catch (readError) {
+    console.warn('[Delegation] Unable to read current delegate:', readError);
+  }
+
+  // Ensure we're on the correct chain
+  const currentChainId = getChainId(config);
+  if (currentChainId !== chainId) {
+    console.log(`[Delegation] Switching to chain ${chainId}...`);
+    await switchChain(config, { chainId: chainId as 1 | 10 | 137 | 8453 | 11155111 | 100 | 42161 });
+    const newChainId = getChainId(config);
+    if (newChainId !== chainId) {
+      throw new Error(`Failed to switch to chain ${chainId}. Please switch manually.`);
+    }
+  }
+
+  // Call delegate() on the token
+  console.log('[Delegation] Calling delegate() on token contract...');
+  const txHash = await writeContractAsync({
+    address: tokenAddress,
+    abi: TokenDelegationABI,
+    functionName: 'delegate',
+    args: [delegatee],
+  });
+
+  console.log('[Delegation] Token delegation tx submitted:', txHash);
+
+  // Wait for confirmation
+  try {
+    await publicClient.waitForTransactionReceipt({ hash: txHash });
+    console.log('[Delegation] Token delegation confirmed!');
+  } catch (receiptError) {
+    console.warn('[Delegation] Could not confirm receipt:', receiptError);
+  }
+
+  return { hash: txHash };
+}
+
+// ABI for AAVE token which uses delegateByType instead of delegate
+const AaveTokenDelegationABI = [
+  {
+    inputs: [
+      { name: 'delegatee', type: 'address' },
+      { name: 'delegationType', type: 'uint8' },
+    ],
+    name: 'delegateByType',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { name: 'delegator', type: 'address' },
+      { name: 'delegationType', type: 'uint8' },
+    ],
+    name: 'getDelegateeByType',
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { name: 'user', type: 'address' },
+      { name: 'delegationType', type: 'uint8' },
+    ],
+    name: 'getPowerCurrent',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
+
+/**
+ * Delegate using AAVE's delegateByType function
+ * AAVE uses different delegation types: 0 = VOTING, 1 = PROPOSITION
+ * For Snapshot voting, we need type 1 (proposition power)
+ */
+async function delegateAaveToken(
+  delegator: `0x${string}`,
+  delegatee: `0x${string}`,
+  writeContractAsync: WriteContractAsync,
+  tokenAddress: `0x${string}`,
+  chainId: number,
+  publicClient: ReturnType<typeof createPublicClient>,
+  delegationType: number = 1 // 1 = PROPOSITION (used by Snapshot)
+): Promise<{ hash: string | null; alreadyDelegated?: boolean }> {
+  console.log('[Delegation] Using AAVE delegateByType...', {
+    tokenAddress,
+    delegator,
+    delegatee,
+    chainId,
+    delegationType,
+  });
+
+  // Check current delegate
+  try {
+    const currentDelegate = await publicClient.readContract({
+      address: tokenAddress,
+      abi: AaveTokenDelegationABI,
+      functionName: 'getDelegateeByType',
+      args: [delegator, delegationType],
+    }) as `0x${string}`;
+
+    if (currentDelegate?.toLowerCase() === delegatee.toLowerCase()) {
+      console.log('[Delegation] Already delegated to this address');
+      return { hash: null, alreadyDelegated: true };
+    }
+    console.log('[Delegation] Current delegate:', currentDelegate);
+  } catch (readError) {
+    console.warn('[Delegation] Unable to read current delegate:', readError);
+  }
+
+  // Ensure we're on the correct chain
+  const currentChainId = getChainId(config);
+  if (currentChainId !== chainId) {
+    console.log(`[Delegation] Switching to chain ${chainId}...`);
+    await switchChain(config, { chainId: chainId as 1 | 10 | 137 | 8453 | 11155111 | 100 | 42161 });
+    const newChainId = getChainId(config);
+    if (newChainId !== chainId) {
+      throw new Error(`Failed to switch to chain ${chainId}. Please switch manually.`);
+    }
+  }
+
+  // Call delegateByType() on the AAVE token
+  console.log('[Delegation] Calling delegateByType() on AAVE token...');
+  const txHash = await writeContractAsync({
+    address: tokenAddress,
+    abi: AaveTokenDelegationABI,
+    functionName: 'delegateByType',
+    args: [delegatee, delegationType],
+  });
+
+  console.log('[Delegation] AAVE delegation tx submitted:', txHash);
+
+  // Wait for confirmation
+  try {
+    await publicClient.waitForTransactionReceipt({ hash: txHash });
+    console.log('[Delegation] AAVE delegation confirmed!');
+  } catch (receiptError) {
+    console.warn('[Delegation] Could not confirm receipt:', receiptError);
+  }
+
+  return { hash: txHash };
+}
+
+/**
+ * Custom delegation handler for Aave (aavedao.eth)
+ * Aave uses delegateByType on the AAVE token on Ethereum mainnet
+ * Type 1 (PROPOSITION) is used by Snapshot for voting power
+ */
+const delegateAave: CustomDelegationHandler = async (
+  delegator,
+  delegatee,
+  writeContractAsync,
+  tokenAddress,
+  _chainId
+) => {
+  // Aave uses delegateByType on Ethereum mainnet
+  const aaveTokenAddress = tokenAddress || '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9' as `0x${string}`;
+  const aaveChainId = CHAIN_IDS.ETHEREUM; // Always Ethereum for AAVE token
+
+  return delegateAaveToken(
+    delegator,
+    delegatee,
+    writeContractAsync,
+    aaveTokenAddress,
+    aaveChainId,
+    ethereumPublicClient,
+    1 // PROPOSITION type for Snapshot voting
+  );
+};
+
+/**
+ * Custom delegation handler for Arbitrum (arbitrumfoundation.eth)
+ * Arbitrum uses token-native delegation on the ARB token on Arbitrum One
+ */
+const delegateArbitrum: CustomDelegationHandler = async (
+  delegator,
+  delegatee,
+  writeContractAsync,
+  tokenAddress,
+  _chainId
+) => {
+  // Arbitrum uses token-native delegation on ARB token on Arbitrum One
+  const arbTokenAddress = tokenAddress || '0x912CE59144191C1204E64559FE8253a0e49E6548' as `0x${string}`;
+  const arbChainId = CHAIN_IDS.ARBITRUM; // Always Arbitrum for ARB token
+
+  return delegateTokenNative(
+    delegator,
+    delegatee,
+    writeContractAsync,
+    arbTokenAddress,
+    arbChainId,
+    arbitrumPublicClient
+  );
+};
+
+/**
+ * Custom delegation handler for Uniswap (uniswapgovernance.eth)
+ * Uniswap uses token-native delegation on the UNI token on Ethereum mainnet
+ */
+const delegateUniswap: CustomDelegationHandler = async (
+  delegator,
+  delegatee,
+  writeContractAsync,
+  tokenAddress,
+  _chainId
+) => {
+  // Uniswap uses token-native delegation on Ethereum mainnet
+  const uniTokenAddress = tokenAddress || '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984' as `0x${string}`;
+  const uniChainId = CHAIN_IDS.ETHEREUM; // Always Ethereum for UNI token
+
+  return delegateTokenNative(
+    delegator,
+    delegatee,
+    writeContractAsync,
+    uniTokenAddress,
+    uniChainId,
+    ethereumPublicClient
+  );
+};
+
+/**
+ * Map of custom delegation handlers by DAO identifier
+ * Add new DAOs here that need custom delegation logic
+ * 
+ * Strategy types:
+ * - erc20-votes: Uses standard delegate(address) on token - handled by delegateTokenNative
+ * - contract-call with delegateByType: Custom ABI (e.g., AAVE) - needs special handler
+ * - delegation / erc20-balance-of-delegation: Uses Snapshot registry on Polygon - default behavior
+ * - erc20-balance-of / ve-balance-of-at: Balance-based, no delegation supported
+ */
+const CUSTOM_DELEGATION_HANDLERS: Record<string, CustomDelegationHandler> = {
+  // Token-native delegation (erc20-votes strategy)
+  'arbitrumfoundation.eth': delegateArbitrum, // ARB token on Arbitrum
+  'uniswapgovernance.eth': delegateUniswap,   // UNI token on Ethereum
+  
+  // Custom delegation ABI
+  'aavedao.eth': delegateAave,                // AAVE token with delegateByType on Ethereum
+  
+  // The following DAOs use Snapshot delegation registry (default behavior):
+  // - balancer.eth: veBAL + delegation-with-cap (Snapshot registry)
+  // - gnosis.eth: delegation strategy (Snapshot registry)
+  // - lido-snapshot.eth: erc20-balance-of-delegation (Snapshot registry)
+  
+  // The following DAOs don't support delegation (balance-based):
+  // - polygonvalidators.eth: Validator staking contract
+  // - quickvote.eth: QUICK balance only
+  // - qidao.eth: veQI balance only
+};
+
+/**
+ * Check if a DAO has a custom delegation handler
+ */
+export function hasCustomDelegationHandler(identifier: string): boolean {
+  return identifier in CUSTOM_DELEGATION_HANDLERS;
+}
+
+/**
+ * Get the custom delegation handler for a DAO (if it exists)
+ */
+function getCustomDelegationHandler(identifier: string): CustomDelegationHandler | null {
+  return CUSTOM_DELEGATION_HANDLERS[identifier] || null;
+}
+
 /**
  * Delegate on Snapshot registry (extracted for consistency)
+ * Uses dedicated Polygon client for all read operations since the registry is on Polygon
  */
 export async function delegateSnapshotOnChain(
-  client: PublicClient,
+  _client: PublicClient, // Not used - we use polygonPublicClient instead
   spaceId: string,
   delegator: `0x${string}`,
   delegatee: `0x${string}`,
@@ -771,10 +1142,24 @@ export async function delegateSnapshotOnChain(
     };
   }
 
+  // Ensure we're on Polygon before proceeding - wagmi simulates on current chain
+  const currentChainId = getChainId(config);
+  if (currentChainId !== CHAIN_IDS.POLYGON) {
+    console.log('[Delegation] Switching to Polygon for Snapshot delegation...');
+    await switchChain(config, { chainId: CHAIN_IDS.POLYGON });
+    // Verify the switch completed
+    const newChainId = getChainId(config);
+    if (newChainId !== CHAIN_IDS.POLYGON) {
+      throw new Error('Failed to switch to Polygon. Please switch manually and try again.');
+    }
+    console.log('[Delegation] Successfully switched to Polygon');
+  }
+
   const id = keccak256(stringToBytes(spaceId));
 
+  // Use Polygon client to read current delegation (registry is on Polygon)
   try {
-    const currentDelegate = (await client.readContract({
+    const currentDelegate = (await polygonPublicClient.readContract({
       address: SNAPSHOT_DELEGATION_REGISTRY,
       abi: SnapshotDelegationRegistryABI,
       functionName: 'delegation',
@@ -788,46 +1173,38 @@ export async function delegateSnapshotOnChain(
     console.warn('[Delegation] Unable to read current Snapshot delegate:', readError);
   }
 
-  let gas: bigint | undefined;
-  let maxFeePerGas: bigint | undefined;
-  let maxPriorityFeePerGas: bigint | undefined;
+  // Note: Snapshot Delegation Registry is on Polygon (chainId 137)
+  // The wallet should already be on Polygon (switched above)
+  console.log('[Delegation] Submitting setDelegate transaction to Polygon...', {
+    registry: SNAPSHOT_DELEGATION_REGISTRY,
+    spaceId,
+    delegator,
+    delegatee,
+    id: id,
+  });
 
-  try {
-    gas = await client.estimateContractGas({
-      account: delegator,
-      address: SNAPSHOT_DELEGATION_REGISTRY,
-      abi: SnapshotDelegationRegistryABI,
-      functionName: 'setDelegate',
-      args: [id, delegatee],
-    });
-  } catch (gasError) {
-    console.warn('[Delegation] Unable to estimate gas for Snapshot delegation:', gasError);
-  }
-
-  try {
-    const fees = await client.estimateFeesPerGas();
-    maxFeePerGas = fees.maxFeePerGas;
-    maxPriorityFeePerGas = fees.maxPriorityFeePerGas;
-  } catch (feesError) {
-    console.warn('[Delegation] Unable to estimate fees for Snapshot delegation:', feesError);
-  }
-
+  // Let wagmi/MetaMask handle gas estimation - don't pass pre-calculated values
+  // This avoids potential mismatches between our estimation and the wallet's
   const txHash = await writeContractAsync({
     address: SNAPSHOT_DELEGATION_REGISTRY,
     abi: SnapshotDelegationRegistryABI,
     functionName: 'setDelegate',
     args: [id, delegatee],
-    account: delegator,
-    chain: client.chain,
-    gas: gas ? (gas * 120n) / 100n : undefined,
-    maxFeePerGas,
-    maxPriorityFeePerGas,
   });
 
+  console.log('[Delegation] Transaction submitted! Hash:', txHash);
+
+  // Use Polygon client to wait for transaction receipt with timeout (60 seconds)
+  // Don't block forever - if it times out, the tx may still succeed
   try {
-    await client.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+    await Promise.race([
+      polygonPublicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Receipt timeout')), 60000))
+    ]);
+    console.log('[Delegation] Transaction confirmed!');
   } catch (receiptError) {
-    console.warn('[Delegation] Unable to confirm Snapshot delegation receipt:', receiptError);
+    console.warn('[Delegation] Unable to confirm Snapshot delegation receipt (may still succeed):', receiptError);
+    console.warn('[Delegation] Check Polygonscan for tx:', `https://polygonscan.com/tx/${txHash}`);
   }
 
   return { hash: txHash };
@@ -835,6 +1212,7 @@ export async function delegateSnapshotOnChain(
 
 /**
  * Enhanced delegateOnChain with source routing
+ * Checks for custom delegation handlers first, then falls back to standard methods
  */
 export async function delegateOnChainWithSource(
   client: PublicClient,
@@ -846,6 +1224,14 @@ export async function delegateOnChainWithSource(
   tokenAddress?: `0x${string}`,
   chainId?: number
 ) {
+  // Check for custom delegation handler first (e.g., Aave uses token-native delegation)
+  const customHandler = getCustomDelegationHandler(identifier);
+  if (customHandler) {
+    console.log(`[Delegation] Using custom handler for ${identifier}`);
+    return customHandler(delegator, delegatee, writeContractAsync, tokenAddress, chainId);
+  }
+
+  // Standard delegation routing
   if (source === 'snapshot') {
     return delegateSnapshotOnChain(
       client,
@@ -879,9 +1265,10 @@ export async function delegateOnChainWithSource(
 
 /**
  * Clear on‐chain delegation.
+ * Uses dedicated Polygon client for all read operations since the registry is on Polygon
  */
 export async function revokeOnChain(
-  client: PublicClient,
+  _client: PublicClient, // Not used - we use polygonPublicClient instead
   spaceId: string,
   delegator: `0x${string}`,
   writeContractAsync: WriteContractAsync
@@ -905,8 +1292,9 @@ export async function revokeOnChain(
   let maxFeePerGas: bigint | undefined;
   let maxPriorityFeePerGas: bigint | undefined;
 
+  // Use Polygon client for gas estimation
   try {
-    gas = await client.estimateContractGas({
+    gas = await polygonPublicClient.estimateContractGas({
       account: delegator,
       address: SNAPSHOT_DELEGATION_REGISTRY,
       abi: SnapshotDelegationRegistryABI,
@@ -917,8 +1305,9 @@ export async function revokeOnChain(
     console.warn('[Delegation] Unable to estimate gas for Snapshot revocation:', gasError);
   }
 
+  // Use Polygon client for fee estimation
   try {
-    const fees = await client.estimateFeesPerGas();
+    const fees = await polygonPublicClient.estimateFeesPerGas();
     maxFeePerGas = fees.maxFeePerGas;
     maxPriorityFeePerGas = fees.maxPriorityFeePerGas;
   } catch (feesError) {
@@ -931,16 +1320,21 @@ export async function revokeOnChain(
     functionName: 'clearDelegate',
     args: [id],
     account: delegator,
-    chain: client.chain,
+    // Snapshot Delegation Registry is always on Polygon
+    chainId: CHAIN_IDS.POLYGON,
     gas: gas ? (gas * 120n) / 100n : undefined,
     maxFeePerGas,
     maxPriorityFeePerGas,
   });
 
+  // Use Polygon client to wait for transaction receipt with timeout
   try {
-    await client.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+    await Promise.race([
+      polygonPublicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Receipt timeout')), 30000))
+    ]);
   } catch (receiptError) {
-    console.warn('[Delegation] Unable to confirm Snapshot revocation receipt:', receiptError);
+    console.warn('[Delegation] Unable to confirm Snapshot revocation receipt (may still succeed):', receiptError);
   }
 
   return { hash: txHash };

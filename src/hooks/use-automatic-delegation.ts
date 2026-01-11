@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { DaoConfigItem } from '@/lib/constants';
+import { getChainId } from '@wagmi/core';
+import { config } from '@/lib/wagmi';
+import { DaoConfigItem, CHAIN_IDS } from '@/lib/constants';
+import { hasCustomDelegationHandler } from '@/lib/utils';
 
 interface UseAutomaticDelegationProps {
   userAddress?: string;
@@ -16,6 +19,7 @@ interface UseAutomaticDelegationProps {
   delegateToAgent: () => Promise<boolean>;
   predictAddress: () => Promise<string | undefined>;
   switchToCorrectNetwork: () => Promise<boolean>;
+  switchToPolygon: () => Promise<boolean>;
   onStepChange?: (step: string | null) => void;
   checkExistingDelegation: () => Promise<{ exists: boolean; target?: string }>;
 }
@@ -34,6 +38,7 @@ export function useAutomaticDelegation({
   delegateToAgent,
   predictAddress,
   switchToCorrectNetwork,
+  switchToPolygon,
   onStepChange,
   checkExistingDelegation: _checkExistingDelegation, // eslint-disable-line @typescript-eslint/no-unused-vars
 }: UseAutomaticDelegationProps) {
@@ -58,10 +63,43 @@ export function useAutomaticDelegation({
       setOpen(true);
       setShowSetupPhase(true);
 
-      // Switch networks if needed
-      if (chainId !== dao.chainId) {
-        const switched = await switchToCorrectNetwork();
-        if (!switched) return;
+      // DAOs with custom delegation handlers manage their own chain switching
+      // (e.g., Aave uses token-native delegation on Ethereum, not Polygon)
+      const hasCustomHandler = hasCustomDelegationHandler(dao.identifier);
+      
+      if (!hasCustomHandler) {
+        // For standard Snapshot DAOs, we need to switch to Polygon for delegation
+        // For Tally DAOs, we need to switch to the DAO's chain
+        const requiredChainId = dao.source === 'snapshot' ? CHAIN_IDS.POLYGON : dao.chainId;
+        const networkName = dao.source === 'snapshot' ? 'Polygon' : dao.name;
+
+        if (chainId !== requiredChainId) {
+          toast.info(`Switching to ${networkName} network...`);
+          const switched = dao.source === 'snapshot' 
+            ? await switchToPolygon() 
+            : await switchToCorrectNetwork();
+          if (!switched) return;
+          
+          // Verify chain actually switched by polling wagmi config
+          const maxAttempts = 20; // 10 seconds max
+          let attempts = 0;
+          while (attempts < maxAttempts) {
+            const currentChainId = getChainId(config);
+            if (currentChainId === requiredChainId) {
+              console.log('[AutoDelegation] Chain switch verified:', currentChainId);
+              break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+          }
+          
+          if (attempts >= maxAttempts) {
+            toast.error(`Failed to switch to ${networkName}. Please switch manually.`);
+            return;
+          }
+        }
+      } else {
+        console.log('[AutoDelegation] DAO has custom delegation handler, skipping pre-switch');
       }
 
       // 1. Predict the agent address
@@ -71,7 +109,7 @@ export function useAutomaticDelegation({
         throw new Error('Failed to predict a valid agent address');
       }
 
-      // 2. Delegate tokens
+      // 2. Delegate tokens to the agent
       setStep('delegate-tokens');
       const delegationSuccess = await delegateToAgent();
       if (!delegationSuccess) {

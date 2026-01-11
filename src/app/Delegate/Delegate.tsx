@@ -105,6 +105,7 @@ export function Delegate({ dao }: DelegateProps) {
     delegationTarget,
     isWrongNetwork,
     switchToCorrectNetwork,
+    switchToPolygon,
     checkExistingDelegation,
   } = useDelegationVerification({
     userAddress: userAddress as `0x${string}` | undefined,
@@ -130,6 +131,7 @@ export function Delegate({ dao }: DelegateProps) {
     delegateToAgent,
     predictAddress,
     switchToCorrectNetwork,
+    switchToPolygon,
     onStepChange: setCurrentStep,
     checkExistingDelegation,
   });
@@ -140,6 +142,7 @@ export function Delegate({ dao }: DelegateProps) {
     chainId,
     daoName: dao.name,
     daoChainId: dao.chainId,
+    daoSource: dao.source as 'snapshot' | 'tally',
     setDelegating,
     setDelegated,
     setShowStopConfirmation,
@@ -147,6 +150,7 @@ export function Delegate({ dao }: DelegateProps) {
     stopAgentAndRevoke,
     stopAgentOnly,
     switchToCorrectNetwork,
+    switchToPolygon,
   });
 
   // Token balance query
