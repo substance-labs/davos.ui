@@ -16,6 +16,7 @@ import { PROPOSALS_QUERY, SPACE_QUERY, DaoConfigItem } from '@/lib/constants';
 import { useDaoInfo, useGraphQL, useProposals } from '@/hooks/use-dao';
 import { useMemo } from 'react';
 import { calculateDaoMetrics, DaoData } from '@/lib/proposal-calc-utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface DaoCardProps {
   dao: DaoConfigItem;
@@ -124,7 +125,24 @@ export function DaoCard({ dao, logo }: DaoCardProps) {
         </div>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           {isLoading ? (
-            <div>Loading data...</div>
+            <div className="w-full space-y-2">
+              <div className="flex gap-2 items-center">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-5 w-12 rounded-full" />
+              </div>
+              <div className="flex gap-2 items-center">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-5 w-10 rounded-full" />
+              </div>
+              <div className="flex gap-2 items-center">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-5 w-8 rounded-full" />
+              </div>
+              <div className="flex gap-2 items-center">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-5 w-14 rounded-full" />
+              </div>
+            </div>
           ) : error ? (
             <div className="text-red-500">Failed to load DAO data</div>
           ) : (
@@ -175,7 +193,9 @@ export function DaoCard({ dao, logo }: DaoCardProps) {
                   <TooltipTrigger className="line-clamp-1 flex gap-2 font-medium">
                     Participation Effort
                     <Badge variant="outline">{participationEffort}</Badge>
-                    <div className="font-light txt-xs text-muted-foreground">hh/month</div>
+                    {participationEffort !== 'N/A' && (
+                      <div className="font-light txt-xs text-muted-foreground">hh/month</div>
+                    )}
                   </TooltipTrigger>
                   <TooltipContent>
                     <p className="w-56">
