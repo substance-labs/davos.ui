@@ -522,11 +522,8 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
     return proposalTableData.slice(indexOfFirstProposal, indexOfLastProposal).map(proposal => {
       let voteStatus: 'yes' | 'no' | 'not-voted' | null = null;
 
-      if (proposal.state.toLowerCase() === 'active' || proposal.state.toLowerCase() === 'pending') {
-        // Active/pending proposals have undefined vote status
-        voteStatus = null;
-      } else if (enabledAgent) {
-        // For closed proposals with agent enabled, check the fetched vote details
+      if (enabledAgent) {
+        // Check the fetched vote details for any proposal (active or closed)
         const details = voteDetailsMap[proposal.id];
         if (details && details.status === 'voted' && details.voteChoice !== null) {
           // voteChoice is already 'yes' or 'no' string from the API
@@ -534,6 +531,7 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
         } else if (details && details.status === 'expired') {
           voteStatus = 'not-voted';
         }
+        // For active/pending proposals without a vote, voteStatus remains null
       }
 
       return {

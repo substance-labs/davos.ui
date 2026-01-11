@@ -89,7 +89,7 @@ const SuggestionContent = ({
   const stateLC = proposalState?.toLowerCase();
   const isClosed = stateLC === 'closed' || stateLC === 'defeated';
   const getVoteLabel = () => {
-    if (isClosed && hasAgentVoted) {
+    if (hasAgentVoted) {
       return 'Agent Voted';
     } else if (isAgentEnabled) {
       return 'Agent will vote';
@@ -201,7 +201,7 @@ const SuggestionContent = ({
           <p className="text-sm text-muted-foreground">{voteReason}</p>
         </div>
 
-        {onVoteNow && (
+        {onVoteNow && !hasAgentVoted && (
           <Button
             variant="outline"
             className="w-full mt-4"
@@ -670,7 +670,7 @@ export function DrawerDialog({ proposal, isAgentEnabled, voteStatus }: DrawerDia
         >
           {hasVoteResult ? 'Show Agent Reason' : isClosed ? 'No Agent Vote' : 'Preview Agent Vote'}
         </Button>
-        {isAgentEnabled && (
+        {isAgentEnabled && !hasVoteResult && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>

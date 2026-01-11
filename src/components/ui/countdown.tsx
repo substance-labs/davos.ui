@@ -150,12 +150,14 @@ export function Countdown({
   const determineBadgeVariant = (): BadgeProps['variant'] => {
     if (badgeVariant) return badgeVariant;
 
-    // If agent can't vote (no voting power), show outline/muted
-    if (!canVote) return 'outline';
+    // If vote was already cast, show the appropriate color
+    if (voteStatus === 'yes') return 'success';
+    if (voteStatus === 'no') return 'destructive';
+
+    // If agent can't vote (no voting power), show bright red
+    if (!canVote) return 'destructive';
 
     if (timeLeft.isExpired) {
-      if (voteStatus === 'yes') return 'default';
-      if (voteStatus === 'no') return 'destructive';
       return 'outline'; // Not voted
     }
 
@@ -175,7 +177,24 @@ export function Countdown({
 
   // Different display formats based on time left and compact mode
   const getDisplayText = () => {
-    // If agent can't vote, show a different indicator
+    // If vote was already cast, show the result (prioritize over canVote check)
+    if (voteStatus === 'yes') {
+      return (
+        <div className="flex items-center">
+          <Check className="mr-1 h-3 w-3" />
+          <span>Voted Yes</span>
+        </div>
+      );
+    } else if (voteStatus === 'no') {
+      return (
+        <div className="flex items-center">
+          <X className="mr-1 h-3 w-3" />
+          <span>Voted No</span>
+        </div>
+      );
+    }
+
+    // If agent can't vote and no vote was cast, show the alert indicator
     if (!canVote) {
       return (
         <div className="flex items-center justify-center">
@@ -185,28 +204,12 @@ export function Countdown({
     }
 
     if (timeLeft.isExpired) {
-      if (voteStatus === 'yes') {
-        return (
-          <div className="flex items-center">
-            <Check className="mr-1 h-3 w-3" />
-            <span>Voted Yes</span>
-          </div>
-        );
-      } else if (voteStatus === 'no') {
-        return (
-          <div className="flex items-center">
-            <X className="mr-1 h-3 w-3" />
-            <span>Voted No</span>
-          </div>
-        );
-      } else {
-        // Just show the icon for "Not Voted" status, text goes in tooltip
-        return (
-          <div className="flex items-center justify-center">
-            <CircleOff className="h-3 w-3" />
-          </div>
-        );
-      }
+      // Just show the icon for "Not Voted" status, text goes in tooltip
+      return (
+        <div className="flex items-center justify-center">
+          <CircleOff className="h-3 w-3" />
+        </div>
+      );
     }
 
     const showSeconds = timeLeft.days === 0 && timeLeft.hours === 0;
@@ -287,6 +290,13 @@ export function Countdown({
 
   // Handle tooltip content based on state
   const getTooltipContent = () => {
+    // If vote was already cast, show the result first
+    if (voteStatus === 'yes') {
+      return 'Agent voted Yes';
+    } else if (voteStatus === 'no') {
+      return 'Agent voted No';
+    }
+
     // If agent can't vote, show voting power info
     if (!canVote) {
       return votingPower !== undefined 
@@ -297,10 +307,6 @@ export function Countdown({
     if (timeLeft.isExpired) {
       if (voteStatus === 'not-voted') {
         return 'Not Voted by Agent';
-      } else if (voteStatus === 'yes') {
-        return 'Agent voted Yes';
-      } else if (voteStatus === 'no') {
-        return 'Agent voted No';
       }
     }
     
@@ -315,16 +321,17 @@ export function Countdown({
         <TooltipTrigger asChild>
           {useButtonStyle ? (
             <Button
-              variant="outline"
+              variant={voteStatus === 'yes' ? 'default' : (voteStatus === 'no' || !canVote) ? 'destructive' : 'outline'}
               size="sm"
               className={cn(
                 'select-none tabular-nums text-xs cursor-default',
+                voteStatus === 'yes' && 'bg-green-600 hover:bg-green-600/90 text-white',
                 !timeLeft.isExpired && 'relative',
                 className
               )}
             >
               {getDisplayText()}
-              {!timeLeft.isExpired && <span className="countdown-indicator" />}
+              {!timeLeft.isExpired && !voteStatus && canVote && <span className="countdown-indicator" />}
             </Button>
           ) : (
             <Badge
@@ -337,7 +344,7 @@ export function Countdown({
               {...props}
             >
               {getDisplayText()}
-              {!timeLeft.isExpired && <span className="countdown-indicator" />}
+              {!timeLeft.isExpired && !voteStatus && canVote && <span className="countdown-indicator" />}
             </Badge>
           )}
         </TooltipTrigger>
