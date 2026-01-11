@@ -132,17 +132,19 @@ export function calculateParticipationEffort(options: ProposalCalcOptions): stri
 
   if (hasSummary && daoData?.summary?.average_reading_time_per_day) {
     const monthlyMins = parseTimeToMinutes(daoData.summary.average_reading_time_per_day) * 30;
+    if (monthlyMins === 0) return 'N/A';
     return formatMinutesToTime(monthlyMins);
   }
 
   if (proposals.length > 0) {
     const activeCount = proposals.filter(p => p.state === 'active').length;
+    if (activeCount === 0) return 'N/A';
     const minutesPerProposal = source === 'tally' ? 10 : 5;
     const estimatedMinutes = activeCount * minutesPerProposal * 30;
     return formatMinutesToTime(estimatedMinutes);
   }
 
-  return '0h';
+  return 'N/A';
 }
 
 /**
@@ -176,10 +178,9 @@ export function calculateChartData(
       hasSummary && daoData?.summary?.total_proposals
         ? Math.min(Math.round((daoData.summary.total_proposals / 59) * 100), 100)
         : Math.min(Math.round((recentProposals / 30) * 100), 100),
-    participationEffortScore:
-      hasSummary && daoData?.summary?.median_reading_time_per_proposal
-        ? Math.min(Math.round((monthlyMins / 600) * 100), 100)
-        : 0,
+    participationEffortScore: monthlyMins > 0
+      ? Math.min(Math.round((monthlyMins / 600) * 100), 100)
+      : 0,
   };
 }
 
