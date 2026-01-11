@@ -11,7 +11,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Cpu, Star } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ExternalLink, Cpu, Star, CheckCircle2, XCircle, Copy, Loader2, Eye, EyeOff, ScrollText, QrCode } from 'lucide-react';
 import { useSubscriptions } from '@/contexts/subscriptions';
 import { daoConfig, DaoConfigItem, MONTHLY_REPORT_DIRECTIVE, DAVOS_API_ENDPOINT } from '@/lib/constants';
 import { toast } from 'sonner';
@@ -19,6 +20,13 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { DrawerDialog } from '../Suggest/Suggest';
 import { formatNumber } from '@/lib/utils';
 import { useAccount } from 'wagmi';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import {
   Pagination,
   PaginationContent,
@@ -36,6 +44,10 @@ import { useEthos } from '@/contexts/ethos';
 import { useDaoData, useProposals } from '@/hooks/use-dao';
 import { useAI } from '@/hooks/use-ai';
 import { DigestCard } from '@/components/digest-card';
+import { useAgentDelegationStatus } from '@/hooks/use-agent-delegation-status';
+import { useVotingPower } from '@/hooks/use-voting-power';
+import { ManualDelegationContent } from '@/lib/ManualDelegationContent';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Constants
 const PROPOSALS_PER_PAGE = 10;
@@ -43,6 +55,38 @@ const MAX_PAGES_TO_SHOW = 5;
 const RECENT_PROPOSALS_DAYS = 30;
 const SUMMARY_STALE_TIME = 30 * 60 * 1000; // 30 minutes
 const SUMMARY_MIN_LENGTH_FOR_TOGGLE = 100;
+
+// Explorer URLs by chain ID or network name
+const EXPLORER_URLS: Record<string | number, string> = {
+  1: 'https://etherscan.io',
+  42161: 'https://arbiscan.io',
+  137: 'https://polygonscan.com',
+  100: 'https://gnosisscan.io',
+  10: 'https://optimistic.etherscan.io',
+  8453: 'https://basescan.org',
+  // Network name mappings from Snapshot
+  'eth': 'https://etherscan.io',
+  '1': 'https://etherscan.io',
+  'arb1': 'https://arbiscan.io',
+  '42161': 'https://arbiscan.io',
+  'matic': 'https://polygonscan.com',
+  '137': 'https://polygonscan.com',
+  'gno': 'https://gnosisscan.io',
+  '100': 'https://gnosisscan.io',
+  'oeth': 'https://optimistic.etherscan.io',
+  '10': 'https://optimistic.etherscan.io',
+  'base': 'https://basescan.org',
+  '8453': 'https://basescan.org',
+};
+
+function getExplorerUrl(networkOrChainId: string | number, address: string): string {
+  const baseUrl = EXPLORER_URLS[networkOrChainId] || 'https://etherscan.io';
+  return `${baseUrl}/token/${address}`;
+}
+
+function truncateAddress(address: string): string {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
 
 // Shared style classes
 const ICON_WRAPPER_CLASS = 'bg-primary/10 p-1 rounded-md mr-2 flex items-center justify-center';
@@ -204,6 +248,160 @@ function DaoDashboard() {
   return <DashboardContent dao={dao} />;
 }
 
+// Shared style classes for agent card
+const AGENT_ICON_WRAPPER_CLASS = 'bg-primary/10 p-1 rounded-md mr-2 flex items-center justify-center';
+const AGENT_ICON_CLASS = 'h-4 w-4 text-primary';
+
+/**
+ * Agent Configuration Card Component
+ * Shows delegation status, voting power, and agent address
+ */
+function AgentConfigurationCard({ dao, ethos }: { dao: DaoConfigItem; ethos: string | null }) {
+  const [isHidden, setIsHidden] = useState(false);
+  const { 
+    agentAddress, 
+    isDelegated, 
+    votingPower, 
+    tokenSymbol,
+    isLoading 
+  } = useAgentDelegationStatus(dao);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
+  };
+
+  const truncateAddress = (address: string) => {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const formattedVotingPower = () => {
+    const num = parseFloat(votingPower);
+    if (num === 0) return '0';
+    if (num < 0.01) return '< 0.01';
+    if (num >= 1000000) return `${(num / 1000000).toFixed(2)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(2)}K`;
+    return num.toFixed(2);
+  };
+
+  return (
+    <div className="px-4 lg:px-6">
+      <Card>
+        <CardHeader className="pb-0 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm flex items-center">
+            <span className={AGENT_ICON_WRAPPER_CLASS}>
+              <Cpu className={AGENT_ICON_CLASS} />
+            </span>
+            Voting Agent
+          </CardTitle>
+          <button
+            onClick={() => setIsHidden(!isHidden)}
+            className="p-1.5 rounded-md hover:bg-muted transition-colors"
+            title={isHidden ? 'Show details' : 'Hide details'}
+          >
+            {isHidden ? (
+              <EyeOff className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            )}
+          </button>
+        </CardHeader>
+        <CardContent className={`pt-1 transition-all ${isHidden ? 'blur-sm select-none pointer-events-none' : ''}`}>
+          <div className="space-y-3 px-2">
+          {/* Delegation Status */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Delegation Status</span>
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            ) : isDelegated ? (
+              <div className="flex items-center gap-1.5 text-green-600 dark:text-green-500">
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="text-sm font-medium">Active</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 text-red-600 dark:text-red-500">
+                  <XCircle className="h-4 w-4" />
+                  <span className="text-sm font-medium">Not Delegated</span>
+                </div>
+                {agentAddress && (
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-6 px-2 gap-1">
+                        <QrCode className="h-3 w-3" />
+                        <span className="text-xs">Delegate</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Manual Delegation</DialogTitle>
+                      </DialogHeader>
+                      <ManualDelegationContent
+                        daoName={dao.name}
+                        agentAddress={agentAddress}
+                        isWrongNetwork={false}
+                        isLoading={false}
+                        hideNoTokensText={true}
+                        onCheckDelegation={async () => ({ exists: false, target: undefined })}
+                      />
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Voting Power */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Voting Power</span>
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            ) : (
+              <span className="text-sm font-medium">
+                {formattedVotingPower()} {tokenSymbol}
+              </span>
+            )}
+          </div>
+
+          {/* Agent Address */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Agent Address</span>
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            ) : agentAddress ? (
+              <button 
+                onClick={() => copyToClipboard(agentAddress)}
+                className="flex items-center gap-1.5 text-sm font-mono hover:text-primary transition-colors"
+                title="Click to copy"
+              >
+                {truncateAddress(agentAddress)}
+                <Copy className="h-3 w-3" />
+              </button>
+            ) : (
+              <span className="text-sm text-muted-foreground">—</span>
+            )}
+          </div>
+
+          {/* Ethos */}
+          {ethos && (
+            <div className="pt-2 border-t">
+              <p className="text-sm text-muted-foreground mb-1">Your Ethos</p>
+              <p className="text-sm">{ethos}</p>
+            </div>
+          )}
+
+          <NavLink to="/profile">
+            <Button variant="outline" className="w-full">
+              Configure Ethos
+            </Button>
+          </NavLink>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function DashboardContent({ dao }: { dao: DaoConfigItem }) {
   const { ethos } = useEthos();
   const { hasAgent } = useAgents();
@@ -212,6 +410,12 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
   const enabledAgent = hasAgent(dao);
   const account = useAccount();
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Get agent address and voting power from the API
+  const { agentAddress } = useAgentDelegationStatus(dao);
+  const { getVotingPowerForProposal } = useVotingPower(
+    enabledAgent ? agentAddress || undefined : undefined
+  );
 
   // Use the new unified hook for fetching space data
   const {
@@ -274,51 +478,33 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
   // Store vote details fetched from the API for closed proposals
   const [voteDetailsMap, setVoteDetailsMap] = useState<Record<string, { status: string; voteChoice: string | null }>>({});
 
-  // Fetch vote details for proposals when agent is enabled
-  const fetchVoteDetails = useCallback(async (proposalId: string) => {
-    if (!account.address) return null;
+  // Fetch all vote details for user in a single API call
+  const fetchAllVoteDetails = useCallback(async () => {
+    if (!account.address) return;
     try {
-      const response = await fetch(`${DAVOS_API_ENDPOINT}/api/vote-details/${account.address}/${proposalId}`);
-      if (!response.ok) return null;
+      const response = await fetch(`${DAVOS_API_ENDPOINT}/api/vote-details/${account.address}`);
+      if (!response.ok) return;
       const data = await response.json();
-      if (data.data) {
-        const voteChoice = data.data.status === 'voted' 
-          ? (data.data.userVoteChoice ?? data.data.aiVoteChoice) 
-          : null;
-        return { status: data.data.status, voteChoice };
+      if (data.success && Array.isArray(data.data)) {
+        const newDetailsMap: Record<string, { status: string; voteChoice: string | null }> = {};
+        for (const item of data.data) {
+          const voteChoice = item.status === 'voted' 
+            ? (item.userVoteChoice ?? item.aiVoteChoice) 
+            : null;
+          newDetailsMap[item.proposalId] = { status: item.status, voteChoice };
+        }
+        setVoteDetailsMap(newDetailsMap);
       }
-      return null;
     } catch (error) {
-      console.error('Error fetching vote details:', error);
-      return null;
+      console.error('Error fetching all vote details:', error);
     }
   }, [account.address]);
 
-  // Fetch vote details for all closed proposals when agent is enabled
+  // Fetch vote details once when agent is enabled
   useEffect(() => {
-    if (!enabledAgent || !account.address || proposalTableData.length === 0) return;
-
-    const closedProposals = proposalTableData.filter(
-      p => p.state.toLowerCase() !== 'active' && p.state.toLowerCase() !== 'pending'
-    );
-
-    const fetchAllDetails = async () => {
-      const newDetailsMap: Record<string, { status: string; voteChoice: string | null }> = {};
-      
-      await Promise.all(
-        closedProposals.map(async (proposal) => {
-          const details = await fetchVoteDetails(proposal.id);
-          if (details) {
-            newDetailsMap[proposal.id] = details;
-          }
-        })
-      );
-
-      setVoteDetailsMap(prev => ({ ...prev, ...newDetailsMap }));
-    };
-
-    fetchAllDetails();
-  }, [enabledAgent, account.address, proposalTableData, fetchVoteDetails]);
+    if (!enabledAgent || !account.address) return;
+    fetchAllVoteDetails();
+  }, [enabledAgent, account.address, fetchAllVoteDetails]);
 
   const totalPages = Math.max(1, Math.ceil(proposalTableData.length / PROPOSALS_PER_PAGE));
   const indexOfLastProposal = currentPage * PROPOSALS_PER_PAGE;
@@ -441,7 +627,25 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
             </CardHeader>
             <CardFooter className="flex-col items-start gap-3 text-sm">
               {isLoading ? (
-                <div>Loading data...</div>
+                <div className="w-full flex flex-col md:flex-row gap-6">
+                  <div className="md:w-1/4 space-y-2">
+                    <div className="flex gap-2 items-center">
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-5 w-12 rounded-full" />
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <Skeleton className="h-4 w-18" />
+                      <Skeleton className="h-5 w-10 rounded-full" />
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <Skeleton className="h-4 w-12" />
+                      <Skeleton className="h-5 w-14 rounded-full" />
+                    </div>
+                  </div>
+                  <div className="md:w-3/4">
+                    <Skeleton className="h-24 w-full rounded-lg" />
+                  </div>
+                </div>
               ) : error ? (
                 <div className="text-red-500">
                   {typeof error === 'string' ? error : error?.message}
@@ -495,32 +699,41 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
                   )}
                 </div>
               )}
+
+              {/* Governance Tokens - Independent row at bottom */}
+              {spaceData?.strategies?.some((s: { params?: { address?: string } }) => s.params?.address) && (
+                <div className="w-full mt-4 pt-4 border-t flex flex-wrap gap-2 font-medium items-center">
+                  Governance Token{spaceData.strategies.filter((s: { params?: { address?: string } }) => s.params?.address).length > 1 ? 's' : ''}
+                  {spaceData.strategies
+                    .filter((s: { params?: { address?: string; symbol?: string }; name?: string; network?: string }, index: number, arr: { params?: { address?: string } }[]) => 
+                      s.params?.address && 
+                      // Deduplicate by address
+                      arr.findIndex((x: { params?: { address?: string } }) => x.params?.address?.toLowerCase() === s.params?.address?.toLowerCase()) === index
+                    )
+                    .map((strategy: { params?: { address?: string; symbol?: string }; name?: string; network?: string }, index: number) => (
+                      <Badge key={index} variant="outline" className="gap-1">
+                        <a
+                          href={getExplorerUrl(strategy.network || spaceData.network || '1', strategy.params!.address!)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 hover:underline"
+                        >
+                          {strategy.params?.symbol || spaceData.symbol || strategy.name}
+                          <span className="text-muted-foreground">({truncateAddress(strategy.params!.address!)})</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </Badge>
+                    ))
+                  }
+                </div>
+              )}
             </CardFooter>
           </Card>
         </div>
 
-        {/* Monthly Digest Card */}
+        {/* Your Agent Card */}
         {hasAgent(dao) && (
-          <div className="px-4 lg:px-6">
-            <Card>
-              <CardHeader className="pb-0">
-                <CardTitle className="text-sm flex items-center">
-                  <span className={ICON_WRAPPER_CLASS}>
-                    <Cpu className={ICON_CLASS} />
-                  </span>
-                  Your Voting Agent Configuration
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <p className="text-sm mb-4">{ethos}</p>
-                <NavLink to="/profile">
-                  <Button variant="outline" className="w-full">
-                    Configure Ethos
-                  </Button>
-                </NavLink>
-              </CardContent>
-            </Card>
-          </div>
+          <AgentConfigurationCard dao={dao} ethos={ethos} />
         )}
 
         {/* Ethos Card - shown when agent is not active */}
@@ -570,10 +783,15 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
         <div className="px-4 lg:px-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex justify-between">
-                <span>Recent Proposals</span>
+              <CardTitle className="text-sm flex items-center justify-between">
+                <span className="flex items-center">
+                  <span className={ICON_WRAPPER_CLASS}>
+                    <ScrollText className={ICON_CLASS} />
+                  </span>
+                  Proposals
+                </span>
                 {!isLoading && !error && proposalTableData.length > 0 && (
-                  <Badge variant="outline">{proposalTableData.length} proposals total</Badge>
+                  <Badge variant="outline">{proposalTableData.length}  loaded</Badge>
                 )}
               </CardTitle>
             </CardHeader>
@@ -604,20 +822,37 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
                     <tbody>
                       {currentProposals.map(proposal => (
                         <tr key={proposal.id} className="border-b hover:bg-muted/50">
-                          <td className="p-2">
-                            {proposal.state.toLowerCase() === 'active' ? (
-                              <span className="font-bold">{proposal.title}</span>
-                            ) : (
-                              proposal.title
-                            )}
+                          <td className="p-2 max-w-xs">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className={`block truncate cursor-default ${proposal.state.toLowerCase() === 'active' ? 'font-bold' : ''}`}>
+                                    {proposal.title}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-md">
+                                  <p>{proposal.title}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </td>
                           <td className="p-2">
-                            <Badge variant={getStateVariant(proposal.state)} className="text-sm">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className={`pointer-events-none text-xs ${
+                                proposal.state.toLowerCase() === 'active' 
+                                  ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-400' 
+                                  : ''
+                              }`}
+                            >
                               {proposal.state}
-                            </Badge>
+                            </Button>
                           </td>
                           <td className="p-2">
-                            <Badge variant="outline">{proposal.end}</Badge>
+                            <Button variant="outline" size="sm" className="pointer-events-none text-xs">
+                              {proposal.end}
+                            </Button>
                           </td>
                           {/* Always show Actions column but only render content if not 'not-voted' */}
                           {account.address ? (
@@ -633,13 +868,22 @@ function DashboardContent({ dao }: { dao: DaoConfigItem }) {
                           ) : null}
                           {enabledAgent ? (
                             <td className="p-2">
-                              <Countdown
-                                endDate={new Date(proposal.endTimestamp * 1000)}
-                                compact={true}
-                                hoursOffset={3}
-                                proposalId={proposal.id}
-                                voteStatus={proposal.voteStatus}
-                              />
+                              {(() => {
+                                const vpData = getVotingPowerForProposal(proposal.id);
+                                return (
+                                  <Countdown
+                                    endDate={new Date(proposal.endTimestamp * 1000)}
+                                    compact={true}
+                                    hoursOffset={3}
+                                    proposalId={proposal.id}
+                                    voteStatus={proposal.voteStatus}
+                                    canVote={vpData?.canVote !== false}
+                                    votingPower={vpData?.vp}
+                                    scheduledVoteTime={vpData?.scheduledVoteTime ? new Date(vpData.scheduledVoteTime) : null}
+                                    useButtonStyle={true}
+                                  />
+                                );
+                              })()}
                             </td>
                           ) : null}
                         </tr>
