@@ -271,6 +271,8 @@ export const SPACE_QUERY = `
       admins
       strategies {
         name
+        network
+        params
       }
       proposalsCount
       votesCount
