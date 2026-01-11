@@ -155,6 +155,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* <NavSecondary items={data.navSecondary} className="mt-auto" /> */}
       </SidebarContent>
       <SidebarFooter>
+        <NavLink to="/profile">
+          <SidebarMenuButton
+            size="lg"
+            className="cursor-pointer"
+          >
+            <div className="flex aspect-square size-8 items-center justify-center rounded-lg">
+              <SettingsIcon className="size-4" />
+            </div>
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate">Settings</span>
+            </div>
+          </SidebarMenuButton>
+        </NavLink>
         <NavUser user={data.user} />
       </SidebarFooter>
       <SidebarRail />

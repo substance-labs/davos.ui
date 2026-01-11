@@ -25,7 +25,7 @@ export function SiteHeader() {
     } else if (currentPath.includes('/explorer')) {
       return 'Explorer';
     } else if (currentPath.includes('/profile')) {
-      return 'Profile';
+      return 'Settings';
     } else if (currentPath.includes('/trends')) {
       return 'Trends';
     } else if (currentPath.includes('/digest')) {

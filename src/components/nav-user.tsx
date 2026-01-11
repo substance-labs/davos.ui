@@ -170,18 +170,6 @@ export function NavUser({
                       </DropdownMenuGroup>
                       <DropdownMenuSeparator /> */}
                           <DropdownMenuGroup>
-                            <DropdownMenuItem asChild>
-                              <NavLink to="/profile">
-                                <Button
-                                  variant={'ghost'}
-                                  size="sm"
-                                  className="w-full justify-start"
-                                >
-                                  <BadgeCheck className="mr-2 h-4 w-4" />
-                                  Profile
-                                </Button>
-                              </NavLink>
-                            </DropdownMenuItem>
                             <DropdownMenuItem>
                               <Button variant={'ghost'} size="sm" className="w-full justify-start">
                                 <Bell className="mr-2 h-4 w-4" />
